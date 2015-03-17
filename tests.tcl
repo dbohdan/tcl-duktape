@@ -47,6 +47,25 @@ namespace eval ::duktape::tests {
         5         1       NaN 0    5      NaN       5]
     #   (no type) boolean nan null number undefined string
 
+    tcltest::test test3 {jsproc} \
+            -setup $setup \
+            -body {
+        set result {}
+        set id [::duktape::init]
+        ::duktape::jsproc $id foo {{a 1 num} {b 2 num}} {
+            return Math.sin(a) + b;
+        }
+        catch {
+            ::duktape::jsproc $id foo {} {
+                return -1;
+            }
+        }
+        lappend result [foo 0 0]
+        lappend result [foo 1 2]
+        ::duktape::close $id
+        return $result
+    } -result {0 2.8414709848078967}
+
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {
         exit 1

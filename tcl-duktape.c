@@ -322,10 +322,10 @@ Call_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 }
 
 /*
- * Duktcl_Init -- Called when Tcl loads the extension.
+ * Tclduktape_Init -- Called when Tcl loads the extension.
  */
 int DLLEXPORT
-Duktcl_Init(Tcl_Interp *interp)
+Tclduktape_Init(Tcl_Interp *interp)
 {
     Tcl_Namespace *nsPtr;
     int i;
