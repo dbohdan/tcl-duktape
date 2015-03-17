@@ -23,6 +23,30 @@ namespace eval ::duktape::tests {
         return $value
     } -result 7
 
+    tcltest::test test2 {call, types} \
+            -setup $setup \
+            -body {
+        set result {}
+        set id [::duktape::init]
+        lappend result [::duktape::call $id Math.abs -5]
+        lappend result [::duktape::call $id Math.abs {-5 boolean}]
+        lappend result [::duktape::call $id Math.abs {-5 nan}]
+        lappend result [::duktape::call $id Math.abs {-5 null}]
+        lappend result [::duktape::call $id Math.abs {-5 number}]
+        lappend result [::duktape::call $id Math.abs {-5 undefined}]
+        lappend result [::duktape::call $id Math.abs {-5 string}]
+        catch {
+            lappend result [::duktape::call $id Math.abs {-5 foo}]
+        }
+        catch {
+            lappend result [::duktape::call $id Math.abs {-5 hello world}]
+        }
+        ::duktape::close $id
+        return $result
+    } -result [list \
+        5         1       NaN 0    5      NaN       5]
+    #   (no type) boolean nan null number undefined string
+
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {
         exit 1

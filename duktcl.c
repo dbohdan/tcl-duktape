@@ -25,16 +25,19 @@
 #define INIT "::init"
 #define CLOSE "::close"
 #define EVAL "::eval"
+#define CALL "::call"
 
 /* Error messages. */
 
 #define ERROR_TOKEN "can't parse token"
+#define ERROR_ARG_LENGTH "argument must be a list of one or two elements"
 
 /* Usage. */
 
 #define USAGE_INIT ""
 #define USAGE_CLOSE "token"
 #define USAGE_EVAL "token code"
+#define USAGE_CALL "token function ?{arg ?type?}? ..."
 
 /* Data types. */
 
@@ -146,16 +149,14 @@ static int
 Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
     int id;
-    int success;
 
     if (objc != 2) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_CLOSE);
         return TCL_ERROR;
     }
 
-    success = parse_id(cdata, interp, objv[1], &id);
-    if (success != TCL_OK) {
-        return success;
+    if (parse_id(cdata, interp, objv[1], &id) != TCL_OK) {
+        return TCL_ERROR;
     }
 
     duk_destroy_heap(DUKTCL_CDATA->object[id]);
@@ -174,8 +175,7 @@ static int
 Eval_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
     int id;
-    int success;
-    const char* str;
+    const char* js_code;
     duk_int_t duk_result;
 
     if (objc != 3) {
@@ -183,14 +183,13 @@ Eval_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
         return TCL_ERROR;
     }
 
-    success = parse_id(cdata, interp, objv[1], &id);
-    if (success != TCL_OK) {
-        return success;
+    if (parse_id(cdata, interp, objv[1], &id) != TCL_OK) {
+        return TCL_ERROR;
     }
 
-    str = Tcl_GetString(objv[2]);
+    js_code = Tcl_GetString(objv[2]);
 
-    duk_result = duk_peval_string(DUKTCL_CDATA->object[id], str);
+    duk_result = duk_peval_string(DUKTCL_CDATA->object[id], js_code);
 
     Tcl_SetObjResult(interp,
             Tcl_NewStringObj(
@@ -204,6 +203,123 @@ Eval_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     }
 }
 
+
+/*
+ * Call a JS function.
+ * Usage: call token function ?{arg ?type?}? ...
+ * Return value: the result of the function call coerced to string.
+ * Side effects: may change the Duktape interpreter heap.
+ */
+static int
+Call_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
+{
+    int id;
+    int i;
+    int list_length;
+    int tableIndex;
+    int int_value;
+    double double_value;
+    duk_int_t duk_result;
+    Tcl_Obj *value;
+    Tcl_Obj *type;
+
+    static char *types[] = {
+        "boolean",
+        "nan",
+        "null",
+        "number",
+        "string",
+        "undefined",
+        (char *)NULL
+    };
+    enum types {
+        TYPE_BOOLEAN,
+        TYPE_NAN,
+        TYPE_NULL,
+        TYPE_NUMBER,
+        TYPE_STRING,
+        TYPE_UNDEFINED
+    };
+
+    if (objc < 3) {
+        Tcl_WrongNumArgs(interp, 1, objv, USAGE_CALL);
+        return TCL_ERROR;
+    }
+
+    if (parse_id(cdata, interp, objv[1], &id) != TCL_OK) {
+        return TCL_ERROR;
+    }
+
+    /* Eval the function name to put it on the stack. */
+    duk_eval_string(DUKTCL_CDATA->object[id], Tcl_GetString(objv[2]));
+    /* Push the arguments. */
+    for (i = 3; i < objc; i++) {
+        if (Tcl_ListObjIndex(interp, objv[i], 0, &value) != TCL_OK) {
+            return TCL_ERROR;
+        }
+
+        if (Tcl_ListObjLength(interp, objv[i], &list_length) != TCL_OK) {
+            return TCL_ERROR;
+        }
+
+        if (list_length == 2) {
+            if (Tcl_ListObjIndex(interp, objv[i], 1, &type) != TCL_OK) {
+                return TCL_ERROR;
+            }
+
+            if (Tcl_GetIndexFromObj(interp, type, types, "type", 0,
+                    &tableIndex) != TCL_OK) {
+                return TCL_ERROR;
+            }
+        } else if (list_length == 1) {
+            tableIndex = TYPE_STRING;
+        } else {
+            Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_ARG_LENGTH, -1));
+            return TCL_ERROR;
+        }
+
+        switch ((enum types) tableIndex) {
+            case TYPE_BOOLEAN:
+                if (Tcl_GetIntFromObj(interp, value, &int_value) != TCL_OK) {
+                    return TCL_ERROR;
+                }
+                duk_push_boolean(DUKTCL_CDATA->object[id], int_value);
+                break;
+            case TYPE_NAN:
+                duk_push_nan(DUKTCL_CDATA->object[id]);
+                break;
+            case TYPE_NULL:
+                duk_push_null(DUKTCL_CDATA->object[id]);
+                break;
+            case TYPE_NUMBER:
+                if (Tcl_GetDoubleFromObj(interp, value,
+                        &double_value) != TCL_OK) {
+                    return TCL_ERROR;
+                }
+                duk_push_number(DUKTCL_CDATA->object[id], double_value);
+                break;
+            case TYPE_UNDEFINED:
+                duk_push_undefined(DUKTCL_CDATA->object[id]);
+                break;
+            case TYPE_STRING:
+            default:
+                duk_push_string(DUKTCL_CDATA->object[id], Tcl_GetString(value));
+                break;
+        }
+    }
+    duk_result = duk_pcall(DUKTCL_CDATA->object[id], objc - 3);
+
+    Tcl_SetObjResult(interp,
+            Tcl_NewStringObj(
+                duk_safe_to_string(DUKTCL_CDATA->object[id], -1), -1));
+    duk_pop(DUKTCL_CDATA->object[id]);
+
+    if (duk_result == 0) {
+        return TCL_OK;
+    } else {
+        return TCL_ERROR;
+    }
+}
 
 /*
  * Duktcl_Init -- Called when Tcl loads the extension.
@@ -235,6 +351,7 @@ Duktcl_Init(Tcl_Interp *interp)
     Tcl_CreateObjCommand(interp, NS INIT, Init_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS CALL, Call_Cmd, duktape_data, NULL);
     Tcl_PkgProvide(interp, PACKAGE, VERSION);
 
     Tcl_Eval(interp, "proc " NS "::parseToken token { \
