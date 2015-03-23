@@ -1,5 +1,31 @@
 namespace eval ::duktape {}
 
+set ::duktape::types [list num str]
+
+proc ::duktape::call {id function args} {
+    ::duktape::call-method $id $function $function {*}$args
+}
+
+# Generate procs call-num, call-str.
+foreach type $::duktape::types {
+    proc ::duktape::call-method-$type {id function this args} [format {
+        set callArgs {}
+        foreach arg $args {
+            lappend callArgs [list $arg %1$s]
+        }
+        ::duktape::call-method $id $function $this {*}$callArgs
+    } $type]
+
+    proc ::duktape::call-$type {id function args} [format {
+        set callArgs {}
+        foreach arg $args {
+            lappend callArgs [list $arg %1$s]
+        }
+        ::duktape::call $id $function {*}$callArgs
+    } $type]
+}
+
+# This is used by ::duktape::jsproc.
 proc ::duktape::slugify {text} {
     string trim [regsub -all {[^[:alnum:]]+} [string tolower $text] "-"] "-"
 }
