@@ -66,6 +66,41 @@ namespace eval ::duktape::tests {
         return $result
     } -result {0 2.8414709848078967}
 
+    tcltest::test test4 {oo} \
+            -setup $setup \
+            -body {
+        set result {}
+        set duktapeInterp [::duktape::oo::Duktape new]
+        $duktapeInterp jsproc foo {{a 1 num} {b 2 num}} {
+            return Math.sin(a) + b;
+        }
+        catch {
+            $duktapeInterp jsproc foo {} {
+                return -1;
+            }
+        }
+        lappend result [foo 0 0]
+        lappend result [foo 1 2]
+        $duktapeInterp destroy
+        return $result
+    } -result {0 2.8414709848078967}
+
+    tcltest::test test4 {JSON object} \
+            -setup $setup \
+            -body {
+        set result {}
+        set duktapeInterp [::duktape::oo::Duktape new]
+        set json1 [::duktape::oo::JSON new $duktapeInterp {{"a":[1,2,3]}}]
+        set json2 [::duktape::oo::JSON new $duktapeInterp {{}}]
+        lappend result [$json1 get a 2]
+        $json1 set b "Hello, world!\"'"
+        lappend result [$json1 get b]
+        $json1 destroy
+        $json2 destroy
+        $duktapeInterp destroy
+        return $result
+    } -result [list 3 "Hello, world!\"'"]
+
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {
         exit 1
