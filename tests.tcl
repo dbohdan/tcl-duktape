@@ -95,11 +95,24 @@ namespace eval ::duktape::tests {
         lappend result [$json1 get a 2]
         $json1 set b "Hello, world!\"'"
         lappend result [$json1 get b]
+        $json1 set-json c {["foo", {"bar": "baz"}]}
+        lappend result [$json1 get-json c]
+        $json1 set-json {"test1"}
+        lappend result [$json1 get-json]
+        $json1 parse {"test2"}
+        lappend result [$json1 stringify]
+
         $json1 destroy
         $json2 destroy
         $duktapeInterp destroy
         return $result
-    } -result [list 3 "Hello, world!\"'"]
+    } -result [list \
+            3 \
+            "Hello, world!\"'" \
+            {["foo",{"bar":"baz"}]} \
+            {"test1"} \
+            {"test2"} \
+    ]
 
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {

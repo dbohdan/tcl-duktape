@@ -88,20 +88,33 @@ namespace eval ::duktape::oo {}
         my variable id
         my variable debug
         if {$debug} {
-            puts "evaluating $code"
+            set printedCode $code
+            if {[string length $printedCode] > 80} {
+                set printedCode [string range $printedCode 0 79]...
+            }
+            puts "evaluating code {$printedCode\n}"
         }
         ::duktape::eval $id $code
     }
 
     method call-method args {
         my variable id
+        my variable debug
+        if {$debug} {
+            puts "calling method $args"
+        }
         ::duktape::call-method $id {*}$args
     }
 
     method call args {
         my variable id
+        my variable debug
+        if {$debug} {
+            puts "calling function $args"
+        }
         ::duktape::call $id {*}$args
     }
+
     foreach type $::duktape::types {
         method call-method-$type args [format {
             my variable id
@@ -141,14 +154,25 @@ namespace eval ::duktape::oo {}
                         return id;
                     };
 
+                    that._keyError = function(pathList, from, to, i) {
+                        throw "key " + pathList[i] + " in sequence {" +
+                                Array.prototype.join.apply(
+                                        Array.prototype.slice.apply(pathList,
+                                                [from, to]),
+                                                [' ']) + "} isn't an object";
+                    }
+
                     that._manipulatePath = function(id, pathList, from, to,
                             set, newValue) {
                         var currentPath = that.data[id];
                         var set = set || false;
                         for (var i = from; i < to - 1; i++) {
-                            if (set && (typeof currentPath[pathList[i]] !==
-                                    'object')) {
-                                currentPath[[pathList[i]]] = {};
+                            if (typeof currentPath[pathList[i]] !== 'object') {
+                                if (set) {
+                                    currentPath[[pathList[i]]] = {};
+                                } else {
+                                    that._keyError(pathList, from, to, i);
+                                };
                             };
                             currentPath = currentPath[pathList[i]];
                         };
@@ -157,18 +181,39 @@ namespace eval ::duktape::oo {}
                         };
                         return currentPath[pathList[to - 1]];
                     };
-                    that.set = function(id) {
-                        var value = arguments[arguments.length - 1];
-                        return that._manipulatePath(id, arguments, 1,
-                                arguments.length - 1, true, value);
-                    };
+
                     that.get = function(id) {
                         return that._manipulatePath(id, arguments, 1,
                                 arguments.length, false);
                     };
-                    that.stringify = function(id) {
-                        return JSON.stringify(that.data[id]);
+
+                    that.getJson = function(id) {
+                        if (arguments.length > 1) {
+                            var result = that.get.apply(that, arguments);
+                        } else {
+                            var result = that.data[id];
+                        };
+                        return JSON.stringify(result);
                     };
+
+                    that.set = function(id) {
+                        var value = arguments[arguments.length - 1];
+                        that._manipulatePath(id, arguments, 1,
+                                arguments.length - 1, true, value);
+                        return "";
+                    };
+
+                    that.setJson = function(id) {
+                        var value = JSON.parse(arguments[arguments.length - 1]);
+                        if (arguments.length > 2) {
+                            that._manipulatePath(id, arguments, 1,
+                                    arguments.length - 1, true, value);
+                        } else {
+                            that.data[id] = value;
+                        };
+                        return "";
+                    };
+
                     that.destroy = function(id) {
                         delete that.data[id];
                         // Do not decrement count.
@@ -179,22 +224,25 @@ namespace eval ::duktape::oo {}
                 };
 
                 json_data = jsonStorage.create();
-
-                if (0) {
-                    var tempid = json_data.init('{"a": "b"}');
-                    var tempid2 = json_data.init('{}');
-                    json_data._manipulatePath(tempid, ["hello"], 0, 1, false);
-                    json_data.set(tempid, "hello", 5);
-                    json_data.set(tempid, "a", "b", "c", 42, 5);
-                    json_data.get(tempid, "hello");
-                    json_data.destroy(tempid);
-                    json_data.destroy(tempid2);
-                    delete tempid;
-                    delete tempid2;
-                };
             };
         }
         set jsonId [$d call json_data.init [list $json str]]
+    }
+
+    method get args {
+        my variable d
+        my variable jsonId
+        set result [$d call-str json_data.get $jsonId {*}$args]
+        if {$result eq "undefined"} {
+            error "can't access key $args"
+        }
+        return $result
+    }
+
+    method get-json args {
+        my variable d
+        my variable jsonId
+        $d call-str json_data.getJson $jsonId {*}$args
     }
 
     method set args {
@@ -203,15 +251,17 @@ namespace eval ::duktape::oo {}
         $d call-str json_data.set $jsonId {*}$args
     }
 
-    method get args {
+    method set-json args {
         my variable d
         my variable jsonId
-        $d call-str json_data.get $jsonId {*}$args
+        $d call-str json_data.setJson $jsonId {*}$args
     }
 
     method stringify {} {
-        my variable d
-        my variable jsonId
-        $d call-str json_data.stringify $jsonId
+        my get-json
+    }
+
+    method parse value {
+        my set-json $value
     }
 }

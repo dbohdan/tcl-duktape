@@ -3,7 +3,7 @@ namespace eval ::buildsys {
     namespace export build install uninstall
     namespace ensemble create
 
-    variable cc cc
+    variable cc {cc}
     variable packageDir tcl-duktape
     variable libraryFilename libtclduktape[info sharedlibextension]
 }
@@ -15,7 +15,7 @@ proc ::buildsys::build {} {
             -I[::tcl::pkgconfig get includedir,runtime] \
             -L[::tcl::pkgconfig get libdir,runtime] \
     ]
-    cc -Wall external/duktape.c -shared -o $libraryFilename \
+    cc -Wall -Werror external/duktape.c -shared -o $libraryFilename \
             -fPIC {*}$tclFlags tcl-duktape.c
 }
 
