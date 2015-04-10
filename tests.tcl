@@ -14,6 +14,10 @@ namespace eval ::duktape::tests {
         cd $path
     }} $path]
 
+    tcltest::testConstraint tcloo [expr {
+        ![catch { package require TclOO }]
+    }]
+
     tcltest::test test1 {init, eval and close} \
             -setup $setup \
             -body {
@@ -69,6 +73,8 @@ namespace eval ::duktape::tests {
     tcltest::test test4 {oo} \
             -setup $setup \
             -body {
+        package require duktape::oo
+
         set result {}
         set duktapeInterp [::duktape::oo::Duktape new]
         $duktapeInterp jsproc foo {{a 1 num} {b 2 num}} {
@@ -87,7 +93,10 @@ namespace eval ::duktape::tests {
 
     tcltest::test test4 {JSON object} \
             -setup $setup \
+            -constraints tcloo \
             -body {
+        package require duktape::oo
+
         set result {}
         set duktapeInterp [::duktape::oo::Duktape new]
         set json1 [::duktape::oo::JSON new $duktapeInterp {{"a":[1,2,3]}}]
