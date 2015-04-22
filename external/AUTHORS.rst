@@ -22,6 +22,7 @@ their contributions under the Duktape ``LICENSE.txt`` (in order of appearance):
 * Niki Dobrev
 * Andreas Öman <andreas@lonelycoder.com>
 * László Langó <llango.u-szeged@partner.samsung.com>
+* Legimet <legimet.calc@gmail.com>
 
 Other contributions
 ===================
@@ -49,6 +50,12 @@ bugs, provided ideas, etc; roughly in order of appearance):
 * David Demelier (https://github.com/hftmarkand)
 * Tim Caswell (https://github.com/creationix)
 * Mitchell Blank Jr (https://github.com/mitchblank)
+* https://github.com/yushli
+* Seo Sanghyeon (https://github.com/sanxiyn)
+* Han ChoongWoo (https://github.com/tunz)
+* Joshua Peek (https://github.com/josh)
+* Bruce E. Pascoe (https://github.com/fatcerberus)
+* https://github.com/Kelledin
 
 If you are accidentally missing from this list, send me an e-mail
 (``sami.vaarala@iki.fi``) and I'll fix the omission.

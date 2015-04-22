@@ -9,8 +9,8 @@ a JavaScript interpreter library.
 
 You will need Tcl 8.5 or 8.6 installed on your system and available as `tclsh`
 to build tcl-duktape. You will also need the header files for Tcl. Duktape
-itself is bundled in the repository. To use the object-oriented API wrapper or
-the JSON object system [TclOO](http://wiki.tcl.tk/18152) is required.
+itself is bundled in the repository. To use the object-oriented API wrapper
+and the JSON object system [TclOO](http://wiki.tcl.tk/18152) is required.
 
 ```sh
 # Build and test.
@@ -31,7 +31,7 @@ sudo make install DESTDIR=/custom/path/
 
 ## API
 
-### Basic procedures
+### Procedures
 
 * `::duktape::init` -> token
 * `::duktape::close token` -> (nothing)
@@ -71,5 +71,5 @@ similar. Use `stringify` to get their JSON representation instead.
 
 MIT.
 
-Duktape 1.1.2 is copyright (c) 2013-2015 by Duktape authors and is distributed
+Duktape 1.2.1 is copyright (c) 2013-2015 by Duktape authors and is distributed
 under the MIT license. See `external/LICENSE.txt`.
