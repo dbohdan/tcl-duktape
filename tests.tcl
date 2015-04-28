@@ -88,9 +88,15 @@ namespace eval ::duktape::tests {
         }
         lappend result [foo 0 0]
         lappend result [foo 1 2]
+
+        $duktapeInterp jsmethod sin {{deg 0 number}} {
+            return Math.sin(deg * Math.PI / 180);
+        }
+        lappend result [$duktapeInterp sin 90]
+
         $duktapeInterp destroy
         return $result
-    } -result {0 2.8414709848078967}
+    } -result {0 2.8414709848078967 1}
 
     tcltest::test test4 {JSON object} \
             -setup $setup \

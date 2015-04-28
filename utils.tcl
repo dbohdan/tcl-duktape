@@ -27,7 +27,7 @@ foreach type $::duktape::types {
 
 # This is used by ::duktape::jsproc.
 proc ::duktape::slugify {text} {
-    string trim [regsub -all {[^[:alnum:]]+} [string tolower $text] "-"] "-"
+    string trim [regsub -all {[^[:alnum:]]+} [string tolower $text] _] _
 }
 
 # Create a Tcl proc with JavaScript code. $arguments follows the format of

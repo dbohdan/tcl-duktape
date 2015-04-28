@@ -63,6 +63,14 @@ namespace eval ::duktape::oo {}
         my variable id
         ::duktape::jsproc $id $name $arguments $body
     }
+
+    method jsmethod {name arguments body} {
+        my variable id
+        namespace eval [self namespace]::jsmethods {}
+        set procName [self namespace]::jsmethods::$name
+        ::duktape::jsproc $id $procName $arguments $body
+        ::oo::objdefine [self object] forward $name $procName
+    }
 }
 
 # JSON object.
