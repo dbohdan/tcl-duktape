@@ -224,7 +224,7 @@ CallMethod_Cmd(ClientData cdata, Tcl_Interp *interp, int objc,
     Tcl_Obj *value;
     Tcl_Obj *type;
 
-    static char *types[] = {
+    static const char *types[] = {
         "boolean",
         "nan",
         "null",
