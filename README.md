@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/dbohdan/tcl-duktape.svg)](https://travis-ci.org/dbohdan/tcl-duktape)
 
-This Tcl extension provides bindings for [Duktape](http://duktape.org/), a
+This Tcl extension provides bindings for [Duktape](http://duktape.org/),
 a JavaScript interpreter library.
 
 ## Installation
@@ -21,8 +21,8 @@ sudo make install
 
 By default the shared library is installed to
 [`libdir,runtime`](http://wiki.tcl.tk/11825), e.g., `/usr/lib64`, and the
-package is installed to the subdirectory `tcl-augeas` in `scriptdir,runtime`,
-e.g., `/usr/share/tcl8.6/tcl-augeas`. To install both the shared library and
+package is installed to the subdirectory `tcl-duktape` in `scriptdir,runtime`,
+e.g., `/usr/share/tcl8.6/tcl-duktape`. To install both the shared library and
 the package to `/custom/path/` instead use the command
 
 ```sh
