@@ -72,6 +72,7 @@ namespace eval ::duktape::tests {
 
     tcltest::test test4 {oo} \
             -setup $setup \
+            -constraints tcloo \
             -body {
         package require duktape::oo
 
