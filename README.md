@@ -51,7 +51,11 @@ sudo make install DESTDIR=/custom/path/
 * `$objName call-method-(str|num) method this ?arg?` -> (evaluation result)
 * `$objName call function ?{arg ?type?}?` -> (evaluation result)
 * `$objName call-(str|num) function ?arg?` -> (evaluation result)
-* `$objName name arguments body` -> (nothing)
+* `$objName jsproc name arguments body` -> (nothing)
+* `$objName jsmethod name arguments body` -> (nothing)
+
+`jsmethod` defines a new method in JavaScript on the Duktape object instance
+`$objName`.
 
 ### JSON objects
 
