@@ -29,14 +29,17 @@ proc ::buildsys::install {{customInstallPath {}}} {
     } else {
         set pkgFile pkgIndex.tcl
     }
-    copy-to $packageInstallPath [list $pkgFile pkgIndex.tcl] utils.tcl
+    copy-to $packageInstallPath \
+            [list $pkgFile pkgIndex.tcl] \
+            oo.tcl \
+            utils.tcl
 }
 
 proc ::buildsys::uninstall {{customInstallPath {}}} {
     set-install-paths
 
     delete-in $libInstallPath $libraryFilename
-    delete-in $packageInstallPath pkgIndex.tcl utils.tcl
+    delete-in $packageInstallPath pkgIndex.tcl oo.tcl utils.tcl
     delete $packageInstallPath
 }
 
