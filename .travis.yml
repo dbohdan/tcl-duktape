@@ -1,7 +1,9 @@
 language: c
-before_install:
-- sudo apt-get update -qq
-install:
-- sudo apt-get -y install tcl tcl-dev
+sudo: false
+addons:
+  apt:
+    packages:
+      - tcl
+      - tcl-dev
 script:
-- make test
+  - make test
