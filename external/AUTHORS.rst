@@ -27,6 +27,8 @@ and agreed to irrevocably license their contributions under the Duktape
 * Karl Skomski <karl@skomski.com>
 * Bruce Pascoe <fatcerberus1@gmail.com>
 * René Hollander <rene@rene8888.at>
+* Julien Hamaide (https://github.com/crazyjul)
+* Sebastian Götte (https://github.com/jaseg)
 
 Other contributions
 ===================
@@ -64,6 +66,7 @@ bugs, provided ideas, etc; roughly in order of appearance):
 * Michael Drake (https://github.com/tlsa)
 * https://github.com/chris-y
 * Laurent Zubiaur (https://github.com/lzubiaur)
+* Ole André Vadla Ravnås (https://github.com/oleavr)
 
 If you are accidentally missing from this list, send me an e-mail
 (``sami.vaarala@iki.fi``) and I'll fix the omission.
