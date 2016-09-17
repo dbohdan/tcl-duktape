@@ -6,4 +6,5 @@ addons:
       - tcl
       - tcl-dev
 script:
+  - tclsh configure.tcl
   - make test
