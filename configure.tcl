@@ -1,11 +1,47 @@
 #!/usr/bin/env tclsh
 namespace eval ::buildsys {
-    namespace export build install uninstall
+    namespace export build generate-makefile install uninstall
     namespace ensemble create
 
-    variable cc {cc}
+    variable cc cc
     variable packageDir tcl-duktape
     variable libraryFilename libtclduktape[info sharedlibextension]
+    variable tclsh [info nameofexecutable]
+
+    variable makefile {}
+}
+
+proc ::buildsys::generate-makefile options {
+    variable libraryFilename
+    variable makefile
+    variable tclsh
+
+    set makefile {}
+
+    if {[dict exists $options -destdir]} {
+        set customInstallPath [dict get $options -destdir]
+    } else {
+        set customInstallPath {}
+    }
+
+    target all test
+    target $libraryFilename [list \
+            tcl-duktape.c \
+            external/duktape.c \
+            external/duktape.h \
+            external/duk_config.h \
+    ]
+    build
+    target test $libraryFilename
+    command "'$tclsh' tests.tcl"
+    target install $libraryFilename
+    install $customInstallPath
+    target uninstall
+    uninstall $customInstallPath
+    target clean
+    command "-rm '$libraryFilename'"
+    target .PHONY {clean all install test uninstall}
+    return $makefile
 }
 
 proc ::buildsys::build {} {
@@ -15,16 +51,16 @@ proc ::buildsys::build {} {
             -I[::tcl::pkgconfig get includedir,runtime] \
             -L[::tcl::pkgconfig get libdir,runtime] \
     ]
-    cc -Wall -Werror external/duktape.c -shared -o $libraryFilename \
+    cc -Wall external/duktape.c -shared -o $libraryFilename \
             -fPIC {*}$tclFlags tcl-duktape.c
 }
 
 proc ::buildsys::install {{customInstallPath {}}} {
     set-install-paths
 
-    file mkdir $packageInstallPath
+    command "mkdir -p '$packageInstallPath'"
     copy-to $libInstallPath $libraryFilename
-    if { $customInstallPath eq "" } {
+    if {$customInstallPath eq {}} {
         set pkgFile pkgIndex-libdir.tcl
     } else {
         set pkgFile pkgIndex.tcl
@@ -40,7 +76,7 @@ proc ::buildsys::uninstall {{customInstallPath {}}} {
 
     delete-in $libInstallPath $libraryFilename
     delete-in $packageInstallPath pkgIndex.tcl oo.tcl utils.tcl
-    delete $packageInstallPath
+    command "rmdir '$packageInstallPath'"
 }
 
 # Functionality common to both the installation and the uninstallation
@@ -50,7 +86,7 @@ proc ::buildsys::set-install-paths {} {
         variable libraryFilename
         variable packageDir
 
-        if { $customInstallPath ne "" } {
+        if {$customInstallPath ne {}} {
             set packageInstallPath $customInstallPath
             set libInstallPath $customInstallPath
         } else {
@@ -63,16 +99,32 @@ proc ::buildsys::set-install-paths {} {
 }
 
 proc ::buildsys::main {argv0 argv} {
+    variable makefile
+
     cd [file dirname [file dirname [file normalize $argv0/___]]]
-    buildsys {*}$argv
+
+    set makefile [generate-makefile $argv]
+
+    set ch [open Makefile w]
+    puts $ch $makefile
+    close $ch
 }
 
 # Utility procs.
 
+proc ::buildsys::target {name {deps {}}} {
+    variable makefile
+    append makefile "$name: [join $deps { }]\n"
+}
+
+proc ::buildsys::command line {
+    variable makefile
+    append makefile \t$line\n
+}
+
 proc ::buildsys::cc args {
     variable cc
-    puts "$cc $args"
-    exec -- $cc {*}$args
+    command "'$cc' [join $args { }]"
 }
 
 # Copy files $args to $destDir. Each element in $args can be either a filename
@@ -80,31 +132,14 @@ proc ::buildsys::cc args {
 proc ::buildsys::copy-to {destDir args} {
     foreach file $args {
         lassign $file sourceFilename destFilename
-        set message "copying file $sourceFilename to $destDir"
-        if { ($destFilename ne "") && ($destFilename ne $sourceFilename) } {
-            append message " as $destFilename"
-        } else {
-            set destFilename $sourceFilename
-        }
-        puts $message
-        file copy $sourceFilename [file join $destDir $destFilename]
+        command "cp '$sourceFilename' '[file join $destDir $destFilename]'"
     }
 }
 
-# Delete file or directory $path.
-proc ::buildsys::delete path {
-    if { [file exists $path] } {
-        puts "deleting $path"
-        file delete $path
-    } else {
-        puts "cannot delete nonexistent path $path"
-    }
-}
-
-# Delete file or directory $path.
+# Delete file(s) in $path.
 proc ::buildsys::delete-in {path args} {
     foreach file $args {
-        delete [file join $path $file]
+        command "-rm '[file join $path $file]'"
     }
 }
 

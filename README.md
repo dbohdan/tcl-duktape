@@ -14,6 +14,7 @@ and the JSON object system [TclOO](http://tcl.wiki/18152) is required.
 
 ```sh
 # Build and test.
+tclsh configure.tcl
 make test
 # Install the package.
 sudo make install
@@ -26,7 +27,8 @@ e.g., `/usr/share/tcl8.6/tcl-duktape`. To install both the shared library and
 the package to `/custom/path/` instead use the command
 
 ```sh
-sudo make install DESTDIR=/custom/path/
+tclsh configure.tcl -destdir /custom/path/
+sudo make install
 ```
 
 ## API
@@ -75,5 +77,5 @@ similar. Use `stringify` to get their JSON representation instead.
 
 MIT.
 
-Duktape 1.2.1 is copyright (c) 2013-2015 by Duktape authors and is distributed
+Duktape 1.5 is copyright (c) 2013-2016 by Duktape authors and is distributed
 under the MIT license. See `external/LICENSE.txt`.
