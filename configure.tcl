@@ -11,17 +11,25 @@ namespace eval ::buildsys {
     variable makefile {}
 }
 
-proc ::buildsys::generate-makefile options {
+proc ::buildsys::generate-makefile args {
     variable libraryFilename
     variable makefile
     variable tclsh
 
     set makefile {}
 
-    if {[dict exists $options -destdir]} {
-        set customInstallPath [dict get $options -destdir]
+    if {[llength $args] % 2 == 1} {
+        error "the arguments should be a dictionary (\"$args\" given)"
+    }
+    if {[dict exists $args -destdir]} {
+        set customInstallPath [dict get $args -destdir]
+        dict unset args -destdir
     } else {
         set customInstallPath {}
+    }
+    if {[dict size $args] > 0} {
+        error "unknown options: $args; should be\
+                \"[dict get [info frame 0] proc] ?-destdir PATH?\""
     }
 
     target all test
@@ -33,32 +41,33 @@ proc ::buildsys::generate-makefile options {
     ]
     build
     target test $libraryFilename
-    command "'$tclsh' tests.tcl"
+    command $tclsh tests.tcl
     target install $libraryFilename
     install $customInstallPath
     target uninstall
     uninstall $customInstallPath
     target clean
-    command "-rm '$libraryFilename'"
-    target .PHONY {clean all install test uninstall}
+    command -rm $libraryFilename
+    target .PHONY {all clean install test uninstall}
     return $makefile
 }
 
 proc ::buildsys::build {} {
+    variable cc
     variable libraryFilename
 
     set tclFlags [list \
             -I[::tcl::pkgconfig get includedir,runtime] \
             -L[::tcl::pkgconfig get libdir,runtime] \
     ]
-    cc -Wall external/duktape.c -shared -o $libraryFilename \
+    command $cc -Wall external/duktape.c -shared -o $libraryFilename \
             -fPIC {*}$tclFlags tcl-duktape.c
 }
 
 proc ::buildsys::install {{customInstallPath {}}} {
     set-install-paths
 
-    command "mkdir -p '$packageInstallPath'"
+    command mkdir -p $packageInstallPath
     copy-to $libInstallPath $libraryFilename
     if {$customInstallPath eq {}} {
         set pkgFile pkgIndex-libdir.tcl
@@ -76,11 +85,10 @@ proc ::buildsys::uninstall {{customInstallPath {}}} {
 
     delete-in $libInstallPath $libraryFilename
     delete-in $packageInstallPath pkgIndex.tcl oo.tcl utils.tcl
-    command "rmdir '$packageInstallPath'"
+    command rmdir $packageInstallPath
 }
 
-# Functionality common to both the installation and the uninstallation
-# operation.
+# Functionality common to both the install and the uninstall procedure.
 proc ::buildsys::set-install-paths {} {
     uplevel 1 {
         variable libraryFilename
@@ -103,10 +111,10 @@ proc ::buildsys::main {argv0 argv} {
 
     cd [file dirname [file dirname [file normalize $argv0/___]]]
 
-    set makefile [generate-makefile $argv]
+    set makefile [generate-makefile {*}$argv]
 
     set ch [open Makefile w]
-    puts $ch $makefile
+    puts -nonewline $ch $makefile
     close $ch
 }
 
@@ -114,32 +122,47 @@ proc ::buildsys::main {argv0 argv} {
 
 proc ::buildsys::target {name {deps {}}} {
     variable makefile
-    append makefile "$name: [join $deps { }]\n"
+    append makefile "$name: [join $deps]\n"
 }
 
-proc ::buildsys::command line {
+proc ::buildsys::quote s {
+    if {[regexp {[^a-zA-Z0-9_./-]} $s]} {
+        # Quote $arg and escape any single quotes in it.
+        set result '[string map {' '"'"' $ $$} $s]'
+    } else {
+        set result $s
+    }
+    return $result
+}
+
+proc ::buildsys::command args {
     variable makefile
-    append makefile \t$line\n
+    set quotedArgs {}
+    foreach arg $args {
+        lappend quotedArgs [quote $arg]
+    }
+    command-raw {*}$quotedArgs
 }
 
-proc ::buildsys::cc args {
-    variable cc
-    command "'$cc' [join $args { }]"
+proc ::buildsys::command-raw args {
+    variable makefile
+    append makefile \t[join $args]\n
 }
 
-# Copy files $args to $destDir. Each element in $args can be either a filename
-# or a list of the format {sourceFilename destFilename}.
+# Emit the commands to copy the files in the list $args to $destDir. Each
+# element in $args can be either a filename or a list of the format
+# {sourceFilename destFilename}.
 proc ::buildsys::copy-to {destDir args} {
     foreach file $args {
         lassign $file sourceFilename destFilename
-        command "cp '$sourceFilename' '[file join $destDir $destFilename]'"
+        command cp $sourceFilename [file join $destDir $destFilename]
     }
 }
 
-# Delete file(s) in $path.
+# Emit the command(s) to delete the given file(s) under $path.
 proc ::buildsys::delete-in {path args} {
     foreach file $args {
-        command "-rm '[file join $path $file]'"
+        command -rm [file join $path $file]
     }
 }
 
