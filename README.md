@@ -28,7 +28,7 @@ the package to `/custom/path/` instead use the command
 
 ```sh
 tclsh configure.tcl -destdir /custom/path/
-sudo make install
+sudo make install # Or just `make install` depending on the destination.
 ```
 
 ## API
