@@ -14,7 +14,7 @@ and the JSON object system [TclOO](http://tcl.wiki/18152) is required.
 
 ```sh
 # Build and test.
-tclsh configure.tcl
+tclsh configure
 make test
 # Install the package.
 sudo make install
@@ -27,7 +27,7 @@ e.g., `/usr/share/tcl8.6/tcl-duktape`. To install both the shared library and
 the package to `/custom/path/` instead use the command
 
 ```sh
-tclsh configure.tcl -destdir /custom/path/
+tclsh configure -destdir /custom/path/
 sudo make install # Or just `make install` depending on the destination.
 ```
 
