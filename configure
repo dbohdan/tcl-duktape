@@ -111,6 +111,7 @@ proc ::buildsys::main {argv0 argv} {
 
     cd [file dirname [file dirname [file normalize $argv0/___]]]
 
+    puts "[file tail [info script]]: creating Makefile"
     set makefile [generate-makefile {*}$argv]
 
     set ch [open Makefile w]
