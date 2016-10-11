@@ -11,26 +11,12 @@ namespace eval ::buildsys {
     variable makefile {}
 }
 
-proc ::buildsys::generate-makefile args {
+proc ::buildsys::generate-makefile {libInstallPath packageInstallPath} {
     variable libraryFilename
     variable makefile
     variable tclsh
 
     set makefile {}
-
-    if {[llength $args] % 2 == 1} {
-        error "the arguments should be a dictionary (\"$args\" given)"
-    }
-    if {[dict exists $args -destdir]} {
-        set customInstallPath [dict get $args -destdir]
-        dict unset args -destdir
-    } else {
-        set customInstallPath {}
-    }
-    if {[dict size $args] > 0} {
-        error "unknown options: $args; should be\
-                \"[dict get [info frame 0] proc] ?-destdir PATH?\""
-    }
 
     target all test
     target $libraryFilename [list \
@@ -43,9 +29,9 @@ proc ::buildsys::generate-makefile args {
     target test $libraryFilename
     command $tclsh tests.tcl
     target install $libraryFilename
-    install $customInstallPath
+    install $libInstallPath $packageInstallPath
     target uninstall
-    uninstall $customInstallPath
+    uninstall $libInstallPath $packageInstallPath
     target clean
     command -rm $libraryFilename
     target .PHONY {all clean install test uninstall}
@@ -64,15 +50,16 @@ proc ::buildsys::build {} {
             -fPIC {*}$tclFlags tcl-duktape.c
 }
 
-proc ::buildsys::install {{customInstallPath {}}} {
-    set-install-paths
+proc ::buildsys::install {libInstallPath packageInstallPath} {
+    variable libraryFilename
 
     command mkdir -p $packageInstallPath
     copy-to $libInstallPath $libraryFilename
-    if {$customInstallPath eq {}} {
-        set pkgFile pkgIndex-libdir.tcl
-    } else {
+    if {$libInstallPath eq $packageInstallPath} {
+        # Installing to a custom destination.
         set pkgFile pkgIndex.tcl
+    } else {
+        set pkgFile pkgIndex-libdir.tcl
     }
     copy-to $packageInstallPath \
             [list $pkgFile pkgIndex.tcl] \
@@ -80,39 +67,51 @@ proc ::buildsys::install {{customInstallPath {}}} {
             utils.tcl
 }
 
-proc ::buildsys::uninstall {{customInstallPath {}}} {
-    set-install-paths
+proc ::buildsys::uninstall {libInstallPath packageInstallPath} {
+    variable libraryFilename
 
     delete-in $libInstallPath $libraryFilename
     delete-in $packageInstallPath pkgIndex.tcl oo.tcl utils.tcl
     command rmdir $packageInstallPath
 }
 
-# Functionality common to both the install and the uninstall procedure.
-proc ::buildsys::set-install-paths {} {
-    uplevel 1 {
-        variable libraryFilename
-        variable packageDir
-
-        if {$customInstallPath ne {}} {
-            set packageInstallPath $customInstallPath
-            set libInstallPath $customInstallPath
-        } else {
-            set packageInstallPath \
-                    [file join [::tcl::pkgconfig get scriptdir,runtime] \
-                            $packageDir]
-            set libInstallPath [::tcl::pkgconfig get libdir,runtime]
-        }
+proc ::buildsys::parse-options argv {
+    if {[llength $argv] % 2 == 1} {
+        error "the arguments should be a dictionary (\"$argv\" given)"
     }
+    if {[dict exists $argv -destdir]} {
+        set customInstallPath [dict get $argv -destdir]
+        dict unset argv -destdir
+    } else {
+        set customInstallPath {}
+    }
+    if {[dict size $argv] > 0} {
+        error "unknown options: $argv; should be\
+                \"[dict get [info frame 0] proc] ?-destdir PATH?\""
+    }
+
+    return $customInstallPath
 }
 
 proc ::buildsys::main {argv0 argv} {
     variable makefile
+    variable packageDir
 
     cd [file dirname [file dirname [file normalize $argv0/___]]]
 
+    set customInstallPath [parse-options $argv]
+    if {$customInstallPath eq {}} {
+        set libInstallPath [::tcl::pkgconfig get libdir,runtime]
+        set packageInstallPath \
+                [file join [::tcl::pkgconfig get scriptdir,runtime] \
+                        $packageDir]
+    } else {
+        set libInstallPath $customInstallPath
+        set packageInstallPath $customInstallPath
+    }
+
     puts "[file tail [info script]]: creating Makefile"
-    set makefile [generate-makefile {*}$argv]
+    set makefile [generate-makefile $libInstallPath $packageInstallPath]
 
     set ch [open Makefile w]
     puts -nonewline $ch $makefile
