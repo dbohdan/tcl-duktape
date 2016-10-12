@@ -77,7 +77,7 @@ proc ::buildsys::uninstall {libInstallPath packageInstallPath} {
 
 # Parse the command line.
 proc ::buildsys::parse-options {argv0 argv} {
-    set usage "Usage: $argv0 \[-destdir PATH\]"
+    set usage "Usage: $argv0 \[--destdir PATH\]"
 
     if {([lsearch $argv {-h}] != -1) || ([lsearch $argv {--help}] != -1)} {
         puts $usage
@@ -90,9 +90,9 @@ proc ::buildsys::parse-options {argv0 argv} {
     }
 
     set destdir {}
-    if {[dict exists $argv -destdir]} {
-        set destdir [dict get $argv -destdir]
-        dict unset argv -destdir
+    if {[dict exists $argv --destdir]} {
+        set destdir [dict get $argv --destdir]
+        dict unset argv --destdir
     }
 
     if {[dict size $argv] > 0} {
