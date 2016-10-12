@@ -75,22 +75,36 @@ proc ::buildsys::uninstall {libInstallPath packageInstallPath} {
     command rmdir $packageInstallPath
 }
 
-proc ::buildsys::parse-options argv {
+# Parse the command line.
+proc ::buildsys::parse-options {argv0 argv} {
+    set usage "Usage: $argv0 \[-destdir PATH\]"
+
+    if {([lsearch $argv {-h}] != -1) || ([lsearch $argv {--help}] != -1)} {
+        puts $usage
+        exit 0
+    }
     if {[llength $argv] % 2 == 1} {
-        error "the arguments should be a dictionary (\"$argv\" given)"
-    }
-    if {[dict exists $argv -destdir]} {
-        set customInstallPath [dict get $argv -destdir]
-        dict unset argv -destdir
-    } else {
-        set customInstallPath {}
-    }
-    if {[dict size $argv] > 0} {
-        error "unknown options: $argv; should be\
-                \"[dict get [info frame 0] proc] ?-destdir PATH?\""
+        puts "Error: Can't parse the command line arguments (\"$argv\").\
+                Expected an even number of them (a Tcl dictionary)."
+        exit 1
     }
 
-    return $customInstallPath
+    set destdir {}
+    if {[dict exists $argv -destdir]} {
+        set destdir [dict get $argv -destdir]
+        dict unset argv -destdir
+    }
+
+    if {[dict size $argv] > 0} {
+        set unknownOpts {}
+        foreach {k v} $argv {
+            lappend unknownOpts "\"$k $v\""
+        }
+        puts "Unknown option(s): [join $unknownOpts {, }]."
+        exit 1
+    }
+
+    return $destdir
 }
 
 proc ::buildsys::main {argv0 argv} {
@@ -99,7 +113,7 @@ proc ::buildsys::main {argv0 argv} {
 
     cd [file dirname [file dirname [file normalize $argv0/___]]]
 
-    set customInstallPath [parse-options $argv]
+    set customInstallPath [parse-options $argv0 $argv]
     if {$customInstallPath eq {}} {
         set libInstallPath [::tcl::pkgconfig get libdir,runtime]
         set packageInstallPath \
