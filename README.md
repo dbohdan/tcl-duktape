@@ -27,7 +27,7 @@ e.g., `/usr/share/tcl8.6/tcl-duktape`. To install both the shared library and
 the package to `/custom/path/` instead use the command
 
 ```sh
-tclsh configure -destdir /custom/path/
+tclsh configure --destdir /custom/path/
 sudo make install # Or just `make install` depending on the destination.
 ```
 
