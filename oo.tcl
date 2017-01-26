@@ -206,4 +206,4 @@ namespace eval ::duktape::oo {}
     }
 }
 
-package provide duktape::oo 0.2.1
+package provide duktape::oo 0.3.0
