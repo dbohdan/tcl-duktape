@@ -1,6 +1,6 @@
 /*
  * Tcl bindings for Duktape.
- * Copyright (c) 2015, 2016 dbohdan.
+ * Copyright (c) 2015, 2016, 2017 dbohdan.
  * This code is released under the terms of the MIT license. See the file
  * LICENSE for details.
  */
