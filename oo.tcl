@@ -61,7 +61,8 @@ namespace eval ::duktape::oo {}
 
     method jsproc {name arguments body} {
         my variable id
-        ::duktape::jsproc $id $name $arguments $body
+        uplevel 1 ::duktape::jsproc [list $id] [list $name] [list $arguments] \
+                [list $body]
     }
 
     method jsmethod {name arguments body} {
@@ -206,4 +207,4 @@ namespace eval ::duktape::oo {}
     }
 }
 
-package provide duktape::oo 0.3.0
+package provide duktape::oo 0.3.1

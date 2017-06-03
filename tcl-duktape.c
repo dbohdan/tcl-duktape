@@ -10,15 +10,11 @@
 /* Package information. */
 
 #define PACKAGE "duktape"
-#define VERSION "0.3.0"
+#define VERSION "0.3.1"
 
 /* Namespace for the extension. */
 
 #define NS "::" PACKAGE
-
-/* Limit on the maximum number of Duktape objects. */
-
-#define MAX_COUNT 16
 
 /* Command names. */
 
@@ -31,6 +27,7 @@
 
 #define ERROR_TOKEN "can't parse token"
 #define ERROR_ARG_LENGTH "argument must be a list of one or two elements"
+#define ERROR_CREATE "can't create Duktape context"
 
 /* Usage. */
 
@@ -43,124 +40,105 @@
 
 struct DuktapeData
 {
-    duk_context *object[MAX_COUNT];
-    int active[MAX_COUNT];
+    int counter;
+    Tcl_HashTable table;
 };
 
 #define DUKTCL_CDATA ((struct DuktapeData *) cdata)
 
 /* Functions */
 
-
-/* Set id to the integer value of the interpreter token. */
-static int
-parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int *id)
+static duk_context *
+parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
 {
-    Tcl_Obj* cmd[2];
-    Tcl_Obj* result_obj = NULL;
-    int success;
-    int conv_result;
+    duk_context *ctx;
+    Tcl_HashEntry *hashPtr;
 
-    cmd[0] = Tcl_NewStringObj(NS "::parseToken", -1);
-    cmd[1] = idobj;
-    Tcl_IncrRefCount(cmd[0]);
-    Tcl_IncrRefCount(cmd[1]);
-    success = Tcl_EvalObjv(interp, 2, cmd, 0);
-    Tcl_DecrRefCount(cmd[0]);
-    Tcl_DecrRefCount(cmd[1]);
-
-    if (success == TCL_OK) {
-        result_obj = Tcl_GetObjResult(interp);
-        Tcl_IncrRefCount(result_obj);
-        conv_result = Tcl_GetIntFromObj(interp, result_obj, id);
-        Tcl_DecrRefCount(result_obj);
-        Tcl_FreeResult(interp);
-
-        if (conv_result != TCL_OK) {
-            Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_TOKEN, -1));
-            return TCL_ERROR;
-        }
-
-        (*id)--; /* Tokens start from one while actual ids start from zero. */
-
-        if (DUKTCL_CDATA->active[*id] != 1) {
-            Tcl_SetObjResult(interp, Tcl_NewStringObj("object not found", -1));
-            return TCL_ERROR;
-        }
-
-        return TCL_OK;
-    } else {
-        return success;
+    hashPtr = Tcl_FindHashEntry(&DUKTCL_CDATA->table, Tcl_GetString(idobj));
+    if (hashPtr == NULL) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_TOKEN, -1));
+        return NULL;
     }
+    ctx = (duk_context *) Tcl_GetHashValue(hashPtr);
+    if (del) {
+        Tcl_DeleteHashEntry(hashPtr);
+    }
+    return ctx;
 }
 
+static void
+cleanup_interp(ClientData cdata, Tcl_Interp *interp)
+{
+    Tcl_HashEntry* hashPtr;
+    Tcl_HashSearch search;
+    duk_context* ctx;
+
+    hashPtr = Tcl_FirstHashEntry(&DUKTCL_CDATA->table, &search);
+    while (hashPtr != NULL) {
+        ctx = (duk_context *) Tcl_GetHashValue(hashPtr);
+        Tcl_SetHashValue(hashPtr, (ClientData) NULL);
+        duk_destroy_heap(ctx);
+        hashPtr = Tcl_NextHashEntry(&search);
+    }
+    Tcl_DeleteHashTable(&DUKTCL_CDATA->table);
+    ckfree(DUKTCL_CDATA);
+}
 
 /*
  * Initialize a Duktape intepreter.
  * Return value: string token of the form "::duktape::(integer)".
- * Side effects: creates an Duktape heap and marks its slot as in use.
+ * Side effects: creates an Duktape heap.
  */
 static int
 Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
-    int id = -1;
-    int i;
-    Tcl_Obj *token[1];
-    Tcl_Obj *result;
+    duk_context *ctx;
+    Tcl_HashEntry *hashPtr;
+    int isNew;
+    Tcl_Obj *token;
 
     if (objc != 1) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_INIT);
         return TCL_ERROR;
     }
 
-    /* Find an unused object slot. */
-    for (i = 0; i < MAX_COUNT; i++) {
-        if (DUKTCL_CDATA->active[i] == 0) {
-            id = i;
-            break;
-        }
-    }
-    if (id == -1) {
-        Tcl_SetObjResult(interp,
-                Tcl_NewStringObj("out of interpreter slots", -1));
+    ctx = duk_create_heap_default();
+    if (ctx == NULL) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_CREATE, -1));
         return TCL_ERROR;
     }
 
-    DUKTCL_CDATA->object[id] = duk_create_heap_default();
-    DUKTCL_CDATA->active[id] = 1;
+    DUKTCL_CDATA->counter++;
+    token = Tcl_ObjPrintf(NS "::%d", DUKTCL_CDATA->counter);
+    hashPtr = Tcl_CreateHashEntry(&DUKTCL_CDATA->table, Tcl_GetString(token),
+            &isNew);
+    Tcl_SetHashValue(hashPtr, (ClientData) ctx);
 
-    token[0] = Tcl_NewIntObj(id + 1);
-    Tcl_IncrRefCount(token[0]);
-    result = Tcl_Format(interp, NS "::%d", 1, token);
-    Tcl_DecrRefCount(token[0]);
-
-    Tcl_SetObjResult(interp, result);
-
+    Tcl_SetObjResult(interp, token);
     return TCL_OK;
 }
 
 /*
  * Destroy a Duktape interpreter heap.
  * Return value: nothing.
- * Side effects: destroys a Duktape interpreter heap and marks its slot as
- * available.
+ * Side effects: destroys a Duktape interpreter heap.
  */
 static int
 Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
-    int id;
+    duk_context *ctx;
 
     if (objc != 2) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_CLOSE);
         return TCL_ERROR;
     }
 
-    if (parse_id(cdata, interp, objv[1], &id) != TCL_OK) {
+    ctx = parse_id(cdata, interp, objv[1], 1);
+    if (ctx == NULL) {
         return TCL_ERROR;
     }
 
-    duk_destroy_heap(DUKTCL_CDATA->object[id]);
-    DUKTCL_CDATA->active[id] = 0;
+    duk_destroy_heap(ctx);
 
     return TCL_OK;
 }
@@ -174,27 +152,28 @@ Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 static int
 Eval_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
-    int id;
-    const char* js_code;
+    duk_context *ctx;
     duk_int_t duk_result;
+    const char *js_code;
 
     if (objc != 3) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_EVAL);
         return TCL_ERROR;
     }
 
-    if (parse_id(cdata, interp, objv[1], &id) != TCL_OK) {
+    ctx = parse_id(cdata, interp, objv[1], 0);
+    if (ctx == NULL) {
         return TCL_ERROR;
     }
 
     js_code = Tcl_GetString(objv[2]);
 
-    duk_result = duk_peval_string(DUKTCL_CDATA->object[id], js_code);
+    duk_result = duk_peval_string(ctx, js_code);
 
     Tcl_SetObjResult(interp,
             Tcl_NewStringObj(
-                duk_safe_to_string(DUKTCL_CDATA->object[id], -1), -1));
-    duk_pop(DUKTCL_CDATA->object[id]);
+                duk_safe_to_string(ctx, -1), -1));
+    duk_pop(ctx);
 
     if (duk_result == 0) {
         return TCL_OK;
@@ -214,12 +193,12 @@ static int
 CallMethod_Cmd(ClientData cdata, Tcl_Interp *interp, int objc,
         Tcl_Obj *const objv[])
 {
-    int id;
     int i;
     int list_length;
     int tableIndex;
     int int_value;
     double double_value;
+    duk_context *ctx;
     duk_int_t duk_result;
     Tcl_Obj *value;
     Tcl_Obj *type;
@@ -247,20 +226,20 @@ CallMethod_Cmd(ClientData cdata, Tcl_Interp *interp, int objc,
         return TCL_ERROR;
     }
 
-    if (parse_id(cdata, interp, objv[1], &id) != TCL_OK) {
+    ctx = parse_id(cdata, interp, objv[1], 0);
+    if (ctx == NULL) {
         return TCL_ERROR;
     }
 
     /* Eval the function name and "this" to put them on the stack. */
     for (i = 2; i < 4; i++)
     {
-        duk_result = duk_peval_string(DUKTCL_CDATA->object[id],
-                Tcl_GetString(objv[i]));
+        duk_result = duk_peval_string(ctx, Tcl_GetString(objv[i]));
         if (duk_result != 0) {
             Tcl_SetObjResult(interp,
                     Tcl_NewStringObj(
-                        duk_safe_to_string(DUKTCL_CDATA->object[id], -1), -1));
-            duk_pop(DUKTCL_CDATA->object[id]);
+                        duk_safe_to_string(ctx, -1), -1));
+            duk_pop(ctx);
             return TCL_ERROR;
         }
     }
@@ -296,36 +275,34 @@ CallMethod_Cmd(ClientData cdata, Tcl_Interp *interp, int objc,
                 if (Tcl_GetIntFromObj(interp, value, &int_value) != TCL_OK) {
                     return TCL_ERROR;
                 }
-                duk_push_boolean(DUKTCL_CDATA->object[id], int_value);
+                duk_push_boolean(ctx, int_value);
                 break;
             case TYPE_NAN:
-                duk_push_nan(DUKTCL_CDATA->object[id]);
+                duk_push_nan(ctx);
                 break;
             case TYPE_NULL:
-                duk_push_null(DUKTCL_CDATA->object[id]);
+                duk_push_null(ctx);
                 break;
             case TYPE_NUMBER:
                 if (Tcl_GetDoubleFromObj(interp, value,
                         &double_value) != TCL_OK) {
                     return TCL_ERROR;
                 }
-                duk_push_number(DUKTCL_CDATA->object[id], double_value);
+                duk_push_number(ctx, double_value);
                 break;
             case TYPE_UNDEFINED:
-                duk_push_undefined(DUKTCL_CDATA->object[id]);
+                duk_push_undefined(ctx);
                 break;
             case TYPE_STRING:
             default:
-                duk_push_string(DUKTCL_CDATA->object[id], Tcl_GetString(value));
+                duk_push_string(ctx, Tcl_GetString(value));
                 break;
         }
     }
-    duk_result = duk_pcall_method(DUKTCL_CDATA->object[id], objc - 4);
+    duk_result = duk_pcall_method(ctx, objc - 4);
 
-    Tcl_SetObjResult(interp,
-            Tcl_NewStringObj(
-                duk_safe_to_string(DUKTCL_CDATA->object[id], -1), -1));
-    duk_pop(DUKTCL_CDATA->object[id]);
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(duk_safe_to_string(ctx, -1), -1));
+    duk_pop(ctx);
 
     if (duk_result == 0) {
         return TCL_OK;
@@ -341,7 +318,6 @@ int DLLEXPORT
 Tclduktape_Init(Tcl_Interp *interp)
 {
     Tcl_Namespace *nsPtr;
-    int i;
     struct DuktapeData *duktape_data;
     duktape_data = (struct DuktapeData *) ckalloc(sizeof(struct DuktapeData));
 
@@ -357,23 +333,16 @@ Tclduktape_Init(Tcl_Interp *interp)
         }
     }
 
-    for (i = 0; i < MAX_COUNT; i++) {
-        duktape_data->active[i] = 0;
-    }
+    duktape_data->counter = 0;
+    Tcl_InitHashTable(&duktape_data->table, TCL_STRING_KEYS);
 
     Tcl_CreateObjCommand(interp, NS INIT, Init_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CALL_METHOD,
             CallMethod_Cmd, duktape_data, NULL);
+    Tcl_CallWhenDeleted(interp, cleanup_interp, duktape_data);
     Tcl_PkgProvide(interp, PACKAGE, VERSION);
-
-    Tcl_Eval(interp, "proc " NS "::parseToken token { \
-        if {![regexp {^(?:" NS "::)?([1-9]+[0-9]*)$} $token _ id]} { \
-            error {" ERROR_TOKEN "}\n\
-        } \n\
-        return $id \n\
-    }");
 
     return TCL_OK;
 }
