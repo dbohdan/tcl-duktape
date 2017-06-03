@@ -1,6 +1,6 @@
 #!/usr/bin/env tclsh
 # Tcl bindings for Duktape.
-# Copyright (c) 2015, 2016 dbohdan.
+# Copyright (c) 2015, 2016, 2017 dbohdan.
 # This code is released under the terms of the MIT license. See the file
 # LICENSE for details.
 
@@ -66,6 +66,7 @@ namespace eval ::duktape::tests {
         }
         lappend result [foo 0 0]
         lappend result [foo 1 2]
+        rename foo {}
         ::duktape::close $id
         return $result
     } -result {0 2.8414709848078967}
@@ -81,13 +82,14 @@ namespace eval ::duktape::tests {
         $duktapeInterp jsproc foo {{a 1 num} {b 2 num}} {
             return Math.sin(a) + b;
         }
-        catch {
+        lappend result catch:[catch {
             $duktapeInterp jsproc foo {} {
                 return -1;
             }
-        }
+        }]
         lappend result [foo 0 0]
         lappend result [foo 1 2]
+        rename foo {}
 
         $duktapeInterp jsmethod sin {{deg 0 number}} {
             return Math.sin(deg * Math.PI / 180);
@@ -96,7 +98,7 @@ namespace eval ::duktape::tests {
 
         $duktapeInterp destroy
         return $result
-    } -result {0 2.8414709848078967 1}
+    } -result {catch:1 0 2.8414709848078967 1}
 
     tcltest::test test4 {JSON object} \
             -setup $setup \
@@ -130,6 +132,23 @@ namespace eval ::duktape::tests {
             {"test2"} \
     ]
 
+    tcltest::test test6 {Cleanup} \
+            -setup $setup \
+            -body {
+        set interp [interp create]
+        $interp eval $setup
+        set result [$interp eval {
+            set dt [::duktape::init]
+            set dt [::duktape::init]
+            ::duktape::close $dt
+            set dt [::duktape::init]
+            ::duktape::eval $dt {1 + 2 + 3 + 4 + 5}
+        }]
+        interp delete $interp
+        return $result
+    } -result 15
+
+    tcltest::cleanupTests
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {
         exit 1
