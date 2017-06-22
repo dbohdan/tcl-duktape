@@ -81,7 +81,7 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
         hashPtr = Tcl_NextHashEntry(&search);
     }
     Tcl_DeleteHashTable(&DUKTCL_CDATA->table);
-    ckfree(DUKTCL_CDATA);
+    ckfree((char *)DUKTCL_CDATA);
 }
 
 /*
