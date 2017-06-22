@@ -10,7 +10,7 @@
 /* Package information. */
 
 #define PACKAGE "duktape"
-#define VERSION "0.3.1"
+#define VERSION "0.3.2"
 
 /* Namespace for the extension. */
 
