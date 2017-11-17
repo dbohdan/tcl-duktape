@@ -10,7 +10,8 @@ a JavaScript interpreter library.
 You will need Tcl 8.5 or 8.6 installed on your system and available as `tclsh`
 to build tcl-duktape. You will also need the header files for Tcl. Duktape
 itself is bundled in the repository. To use the object-oriented API wrapper
-and the JSON object system [TclOO](http://tcl.wiki/18152) is required.
+and the JSON object system [TclOO](https://wiki.tcl-lang.org/18152) is
+required.
 
 ```sh
 # Build and test.
@@ -21,10 +22,10 @@ sudo make install
 ```
 
 By default the shared library is installed to
-[`libdir,runtime`](http://tcl.wiki/11825), e.g., `/usr/lib64`, and the
-package is installed to the subdirectory `tcl-duktape` in `scriptdir,runtime`,
-e.g., `/usr/share/tcl8.6/tcl-duktape`. To install both the shared library and
-the package to `/custom/path/` instead use the command
+[`libdir,runtime`](https://wiki.tcl-lang.org/11825), e.g., `/usr/lib64`, and
+the package is installed to the subdirectory `tcl-duktape` in
+`scriptdir,runtime`, e.g., `/usr/share/tcl8.6/tcl-duktape`. To install both
+the shared library and the package to `/custom/path/` instead use the command
 
 ```sh
 tclsh configure --destdir /custom/path/
