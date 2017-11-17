@@ -43,6 +43,9 @@ and agreed to irrevocably license their contributions under the Duktape
 * Remko Tronçon (https://el-tramo.be)
 * Romero Malaquias (rbsm@ic.ufal.br)
 * Michael Drake <michael.drake@codethink.co.uk>
+* Steven Don (https://github.com/shdon)
+* Simon Stone (https://github.com/sstone1)
+* \J. McC. (https://github.com/jmhmccr)
 
 Other contributions
 ===================

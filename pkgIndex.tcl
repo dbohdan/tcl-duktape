@@ -1,6 +1,6 @@
-package ifneeded "duktape" 0.3.2 [format "%s\n%s" \
+package ifneeded "duktape" 0.3.3 [format "%s\n%s" \
     [list load [file join $dir libtclduktape[info sharedlibextension]]] \
     [list source [file join $dir utils.tcl]] \
 ]
-package ifneeded "duktape::oo" 0.3.2 \
+package ifneeded "duktape::oo" 0.3.3 \
     [list source [file join $dir oo.tcl]]
