@@ -1,183 +1,202 @@
 #!/usr/bin/env tclsh
+
 namespace eval ::buildsys {
     namespace export build generate-makefile install uninstall
     namespace ensemble create
 
-    variable cc cc
-    variable packageDir tcl-duktape
-    variable libraryFilename libtclduktape[info sharedlibextension]
-    variable tclsh [info nameofexecutable]
-
-    variable makefile {}
+    variable config [dict create \
+        cc           cc \
+        ccFlags      {} \
+        destDir      {} \
+        includeDir   [::tcl::pkgconfig get includedir,runtime] \
+        libDir       [::tcl::pkgconfig get libdir,runtime] \
+        packageDest  [file join [::tcl::pkgconfig get scriptdir,runtime] \
+                                tcl-duktape] \
+        libDest      [::tcl::pkgconfig get libdir,runtime] \
+        libraryFile  libtclduktape[info sharedlibextension] \
+        tclsh        [info nameofexecutable] \
+    ]
 }
 
-proc ::buildsys::generate-makefile {libInstallPath packageInstallPath} {
-    variable libraryFilename
-    variable makefile
-    variable tclsh
 
-    set makefile {}
+### Pure functions for generating fragments of the Makefile
 
-    target all test
-    target $libraryFilename [list \
-            tcl-duktape.c \
-            external/duktape.c \
-            external/duktape.h \
-            external/duk_config.h \
-    ]
-    build
-    target test $libraryFilename
-    command $tclsh tests.tcl
-    target install $libraryFilename
-    install $libInstallPath $packageInstallPath
-    target uninstall
-    uninstall $libInstallPath $packageInstallPath
-    target clean
-    command -rm $libraryFilename
-    target .PHONY {all clean install test uninstall}
+proc ::buildsys::generate-makefile config {
+    dict with config {}
+
+    set pkgIndexFile pkgIndex-libdir.tcl
+    # Are we installing to a custom destination?
+    if {$destDir ne {}} {
+        set libDest $destDir
+        set packageDest $destDir
+        set pkgIndexFile pkgIndex.tcl
+    }
+
+    set makefile [join [sl {
+        target all : test
+
+
+        target $libraryFile : tcl-duktape.c \
+                              external/duktape.c \
+                              external/duktape.h \
+                              external/duk_config.h
+        command $cc external/duktape.c \
+                    -o $libraryFile \
+                    -Wall \
+                    -shared \
+                    -fPIC \
+                    -I$includeDir \
+                    -L$libDir \
+                    {*}$ccFlags \
+                    tcl-duktape.c
+
+
+        target test : $libraryFile
+        command $tclsh tests.tcl
+
+
+        target install : $libraryFile
+        command mkdir -p $packageDest
+        copy-to $libDest $libraryFile
+        copy-to $packageDest \
+                [list $pkgIndexFile pkgIndex.tcl] \
+                oo.tcl \
+                utils.tcl
+
+
+        target uninstall
+        delete-in $libDest $libraryFile
+        delete-in $packageDest pkgIndex.tcl oo.tcl utils.tcl
+        command rmdir $packageDest
+
+
+        target clean
+        command -rm $libraryFile
+
+
+        target .PHONY : all clean install test uninstall
+    }] {}]
+
     return $makefile
 }
 
-proc ::buildsys::build {} {
-    variable cc
-    variable libraryFilename
-
-    set tclFlags [list \
-            -I[::tcl::pkgconfig get includedir,runtime] \
-            -L[::tcl::pkgconfig get libdir,runtime] \
-    ]
-    command $cc -Wall external/duktape.c -shared -o $libraryFilename \
-            -fPIC {*}$tclFlags tcl-duktape.c
-}
-
-proc ::buildsys::install {libInstallPath packageInstallPath} {
-    variable libraryFilename
-
-    command mkdir -p $packageInstallPath
-    copy-to $libInstallPath $libraryFilename
-    if {$libInstallPath eq $packageInstallPath} {
-        # Installing to a custom destination.
-        set pkgFile pkgIndex.tcl
-    } else {
-        set pkgFile pkgIndex-libdir.tcl
+proc ::buildsys::target {name {colon {}} args} {
+    if {$args ne {} && $colon ne {:}} {
+        error "expected a \":\", but got \"$colon\""
     }
-    copy-to $packageInstallPath \
-            [list $pkgFile pkgIndex.tcl] \
-            oo.tcl \
-            utils.tcl
-}
-
-proc ::buildsys::uninstall {libInstallPath packageInstallPath} {
-    variable libraryFilename
-
-    delete-in $libInstallPath $libraryFilename
-    delete-in $packageInstallPath pkgIndex.tcl oo.tcl utils.tcl
-    command rmdir $packageInstallPath
-}
-
-# Parse the command line.
-proc ::buildsys::parse-options {argv0 argv} {
-    set usage "Usage: $argv0 \[--destdir PATH\]"
-
-    if {([lsearch $argv {-h}] != -1) || ([lsearch $argv {--help}] != -1)} {
-        puts $usage
-        exit 0
-    }
-    if {[llength $argv] % 2 == 1} {
-        puts "Error: Can't parse the command line arguments (\"$argv\").\
-                Expected an even number of them (a Tcl dictionary)."
-        exit 1
-    }
-
-    set destdir {}
-    if {[dict exists $argv --destdir]} {
-        set destdir [dict get $argv --destdir]
-        dict unset argv --destdir
-    }
-
-    if {[dict size $argv] > 0} {
-        set unknownOpts {}
-        foreach {k v} $argv {
-            lappend unknownOpts "\"$k $v\""
-        }
-        puts "Unknown option(s): [join $unknownOpts {, }]."
-        exit 1
-    }
-
-    return $destdir
-}
-
-proc ::buildsys::main {argv0 argv} {
-    variable makefile
-    variable packageDir
-
-    cd [file dirname [file dirname [file normalize $argv0/___]]]
-
-    set customInstallPath [parse-options $argv0 $argv]
-    if {$customInstallPath eq {}} {
-        set libInstallPath [::tcl::pkgconfig get libdir,runtime]
-        set packageInstallPath \
-                [file join [::tcl::pkgconfig get scriptdir,runtime] \
-                        $packageDir]
-    } else {
-        set libInstallPath $customInstallPath
-        set packageInstallPath $customInstallPath
-    }
-
-    puts "[file tail [info script]]: creating Makefile"
-    set makefile [generate-makefile $libInstallPath $packageInstallPath]
-
-    set ch [open Makefile w]
-    puts -nonewline $ch $makefile
-    close $ch
-}
-
-# Utility procs.
-
-proc ::buildsys::target {name {deps {}}} {
-    variable makefile
-    append makefile "$name: [join $deps]\n"
+    return "$name: [join $args]\n"
 }
 
 proc ::buildsys::quote s {
+    set result $s
     if {[regexp {[^a-zA-Z0-9_./-]} $s]} {
         # Quote $arg and escape any single quotes in it.
         set result '[string map {' '"'"' $ $$} $s]'
-    } else {
-        set result $s
     }
     return $result
 }
 
 proc ::buildsys::command args {
-    variable makefile
     set quotedArgs {}
     foreach arg $args {
         lappend quotedArgs [quote $arg]
     }
-    command-raw {*}$quotedArgs
+    return [command-raw {*}$quotedArgs]
 }
 
 proc ::buildsys::command-raw args {
-    variable makefile
-    append makefile \t[join $args]\n
+    return \t[join $args]\n
 }
 
-# Emit the commands to copy the files in the list $args to $destDir. Each
-# element in $args can be either a filename or a list of the format
-# {sourceFilename destFilename}.
-proc ::buildsys::copy-to {destDir args} {
+# Return the commands to copy the files in the list $args to $dest. Each
+# element in $args must be a list of one of two formats: {sourceFile} or
+# {sourceFile destFile}.
+proc ::buildsys::copy-to {dest args} {
+    set result {}
     foreach file $args {
-        lassign $file sourceFilename destFilename
-        command cp $sourceFilename [file join $destDir $destFilename]
+        switch [llength $file] {
+            1 {
+                lassign $file sourceFile
+                set destFile $sourceFile
+            }
+            2 {
+                lassign $file sourceFile destFile
+            }
+            default {
+                error "expected a list of one or two elements,\
+                       but got [list $file]"
+            }
+        }
+        lappend result [command cp $sourceFile \
+                                   [file join $dest $destFile]]
     }
+    return [join $result {}]
 }
 
-# Emit the command(s) to delete the given file(s) under $path.
+# Return the commands to delete in the directory $path each of the files listed
+# in $args.
 proc ::buildsys::delete-in {path args} {
+    set result {}
     foreach file $args {
-        command -rm [file join $path $file]
+        lappend result [command -rm [file join $path $file]]
     }
+    return [join $result {}]
+}
+
+
+### Script startup, configuration and file output
+
+# Parse the command line arguments.
+proc ::buildsys::parse-options {argv0 argv} {
+    set usage "Usage: $argv0 \[--destdir PATH\] \[--includedir PATH\]\
+               \[--libdir PATH\]"
+
+    if {$argv in {-h -help --help}} {
+        puts $usage
+        exit 0
+    }
+    if {[llength $argv] % 2 == 1} {
+        puts "Error: Can't parse the command line arguments (\"$argv\").\
+              Expected an even number of arguments (a Tcl dictionary)."
+        exit 1
+    }
+
+    set options {}
+    foreach {flag key} {
+        --includedir   includeDir
+        --libdir       libDir
+        --destdir      destDir
+    } {
+        if {[dict exists $argv $flag]} {
+            dict set options $key [dict get $argv $flag]
+            dict unset argv $flag
+        }
+    }
+
+    if {[dict size $argv] > 0} {
+        puts "Unknown option(s): \"[join $argv {", "}]\"."
+        exit 1
+    }
+
+    return $options
+}
+
+proc ::buildsys::main {argv0 argv} {
+    variable config
+
+    cd [file dirname [file dirname [file normalize $argv0/___]]]
+    source sl.tcl
+    namespace path ::sl
+
+    set options [parse-options $argv0 $argv]
+    set config [dict merge $config $options]
+
+    puts "[file tail [info script]]: creating Makefile"
+    set makefile [generate-makefile $config]
+
+    set ch [open Makefile w]
+    puts -nonewline $ch $makefile
+    close $ch
 }
 
 # If this is the main script...
