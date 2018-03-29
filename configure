@@ -13,7 +13,7 @@ namespace eval ::buildsys {
         packageDest  [file join [::tcl::pkgconfig get scriptdir,runtime] \
                                 tcl-duktape] \
         libDest      [::tcl::pkgconfig get libdir,runtime] \
-        libraryFile  libtclduktape[info sharedlibextension] \
+        libraryFile  lib/libtclduktape[info sharedlibextension] \
         tclsh        [info nameofexecutable] \
     ]
 }
@@ -24,23 +24,23 @@ namespace eval ::buildsys {
 proc ::buildsys::generate-makefile config {
     dict with config {}
 
-    set pkgIndexFile pkgIndex-libdir.tcl
+    set pkgIndexFile lib/pkgIndex-libdir.tcl
     # Are we installing to a custom destination?
     if {$destDir ne {}} {
         set libDest $destDir
         set packageDest $destDir
-        set pkgIndexFile pkgIndex.tcl
+        set pkgIndexFile lib/pkgIndex.tcl
     }
 
     set makefile [join [sl {
         target all : test
 
 
-        target $libraryFile : tcl-duktape.c \
-                              external/duktape.c \
-                              external/duktape.h \
-                              external/duk_config.h
-        command $cc external/duktape.c \
+        target $libraryFile : lib/tcl-duktape.c \
+                              vendor/duktape/duktape.c \
+                              vendor/duktape/duktape.h \
+                              vendor/duktape/duk_config.h
+        command $cc vendor/duktape/duktape.c \
                     -o $libraryFile \
                     -Wall \
                     -shared \
@@ -48,7 +48,7 @@ proc ::buildsys::generate-makefile config {
                     -I$includeDir \
                     -L$libDir \
                     {*}$ccFlags \
-                    tcl-duktape.c
+                    lib/tcl-duktape.c
 
 
         target test : $libraryFile
@@ -60,12 +60,12 @@ proc ::buildsys::generate-makefile config {
         copy-to $libDest $libraryFile
         copy-to $packageDest \
                 [list $pkgIndexFile pkgIndex.tcl] \
-                oo.tcl \
-                utils.tcl
+                lib/oo.tcl \
+                lib/utils.tcl
 
 
         target uninstall
-        delete-in $libDest $libraryFile
+        delete-in $libDest [file tail $libraryFile]
         delete-in $packageDest pkgIndex.tcl oo.tcl utils.tcl
         command rmdir $packageDest
 
@@ -117,7 +117,7 @@ proc ::buildsys::copy-to {dest args} {
         switch [llength $file] {
             1 {
                 lassign $file sourceFile
-                set destFile $sourceFile
+                set destFile [file tail $sourceFile]
             }
             2 {
                 lassign $file sourceFile destFile
@@ -185,7 +185,7 @@ proc ::buildsys::main {argv0 argv} {
     variable config
 
     cd [file dirname [file dirname [file normalize $argv0/___]]]
-    source sl.tcl
+    source vendor/sl/sl.tcl
     namespace path ::sl
 
     set options [parse-options $argv0 $argv]

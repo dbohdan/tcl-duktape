@@ -11,14 +11,6 @@ proc ::sl::sl script {
     return $list
 }
 
-proc ::sl::sd script {
-    set dict [dict create]
-    foreach {key value} [commands $script] {
-        dict set dict $key [uplevel 1 $value]
-    }
-    return $dict
-}
-
 # This command comes from https://wiki.tcl-lang.org/21701. It was originally
 # implemented by DGP and then modified by PYK.
 proc ::sl::commands script {

@@ -5,7 +5,7 @@
  * LICENSE for details.
  */
 #include <tcl.h>
-#include "external/duktape.h"
+#include "../vendor/duktape/duktape.h"
 
 /* Package information. */
 
