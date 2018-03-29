@@ -1,4 +1,9 @@
 #!/usr/bin/env tclsh
+# tcl-duktape Makefile generator.
+# Copyright (c) 2015, 2016, 2017, 2018
+# dbohdan and contributors listed in AUTHORS
+# This code is released under the terms of the MIT license. See the file
+# LICENSE for details.
 
 namespace eval ::buildsys {
     namespace export build generate-makefile install uninstall
@@ -144,7 +149,7 @@ proc ::buildsys::delete-in {path args} {
 }
 
 
-### Script startup, configuration and file output
+### Script startup and configuration; file output
 
 # Parse the command line arguments.
 proc ::buildsys::parse-options {argv0 argv} {
