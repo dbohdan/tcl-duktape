@@ -46,7 +46,7 @@ proc ::buildsys::generate-makefile config {
     set makefile [join [sl {
         target all : test
 
-
+        ----
         target $libraryFile : lib/tcl-duktape.c \
                               vendor/duktape/duktape.c \
                               vendor/duktape/duktape.h \
@@ -61,11 +61,11 @@ proc ::buildsys::generate-makefile config {
                     {*}$ccFlags \
                     lib/tcl-duktape.c
 
-
+        ----
         target test : $libraryFile
         command $tclsh tests.tcl
 
-
+        ----
         target install : $libraryFile
         command mkdir -p $packageDest
         copy-to $libDest $libraryFile
@@ -74,17 +74,17 @@ proc ::buildsys::generate-makefile config {
                 lib/oo.tcl \
                 lib/utils.tcl
 
-
+        ----
         target uninstall
         delete-in $libDest [file tail $libraryFile]
         delete-in $packageDest pkgIndex.tcl oo.tcl utils.tcl
         command rmdir $packageDest
 
-
+        ----
         target clean
         command -rm $libraryFile
 
-
+        ----
         target .PHONY : all clean install test uninstall
     }] {}]
 
@@ -105,6 +105,10 @@ proc ::buildsys::quote s {
         set result '[string map {' '"'"' $ $$} $s]'
     }
     return $result
+}
+
+proc ::buildsys::---- {} {
+    return \n
 }
 
 proc ::buildsys::command args {
