@@ -9,9 +9,13 @@ namespace eval ::buildsys {
     namespace export build generate-makefile install uninstall
     namespace ensemble create
 
+    proc env {key default} {
+        return [expr {[info exists ::env($key)] ? $::env($key) : $default}]
+    }
+
     variable config [dict create \
-        cc           cc \
-        ccFlags      {} \
+        cc           [env CC cc] \
+        ccFlags      [env CFLAGS {}] \
         destDir      {} \
         includeDir   [::tcl::pkgconfig get includedir,runtime] \
         libDir       [::tcl::pkgconfig get libdir,runtime] \
@@ -21,6 +25,8 @@ namespace eval ::buildsys {
         libraryFile  lib/libtclduktape[info sharedlibextension] \
         tclsh        [info nameofexecutable] \
     ]
+
+    rename env {}
 }
 
 
@@ -154,7 +160,9 @@ proc ::buildsys::delete-in {path args} {
 # Parse the command line arguments.
 proc ::buildsys::parse-options {argv0 argv} {
     set usage "Usage: $argv0 \[--destdir PATH\] \[--includedir PATH\]\
-               \[--libdir PATH\]"
+               \[--libdir PATH\]\n\n"
+    append usage "This script also uses the value of the\
+                  environment variables CC and CFLAGS."
 
     if {$argv in {-h -help --help}} {
         puts $usage
