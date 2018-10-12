@@ -46,6 +46,14 @@ and agreed to irrevocably license their contributions under the Duktape
 * Steven Don (https://github.com/shdon)
 * Simon Stone (https://github.com/sstone1)
 * \J. McC. (https://github.com/jmhmccr)
+* Jakub Nowakowski (https://github.com/jimvonmoon)
+* Tommy Nguyen (https://github.com/tn0502)
+* Fabrice Fontaine (https://github.com/ffontaine)
+* Christopher Hiller (https://github.com/boneskull)
+* Gonzalo Diethelm (https://github.com/gonzus)
+* Michal Kasperek (https://github.com/michalkas)
+* Andrew Janke (https://github.com/apjanke)
+* Steve Fan (https://github.com/stevefan1999)
 
 Other contributions
 ===================
@@ -84,6 +92,8 @@ bugs, provided ideas, etc; roughly in order of appearance):
 * https://github.com/chris-y
 * Laurent Zubiaur (https://github.com/lzubiaur)
 * Neil Kolban (https://github.com/nkolban)
+* Wilhelm Wanecek (https://github.com/wanecek)
+* Andrew Janke (https://github.com/apjanke)
 
 If you are accidentally missing from this list, send me an e-mail
 (``sami.vaarala@iki.fi``) and I'll fix the omission.
