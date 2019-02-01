@@ -6,5 +6,5 @@ addons:
       - tcl-dev
 script:
   - ./autogen.sh
-  - ./configure
+  - ./configure --disable-stubs
   - make test
