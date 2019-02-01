@@ -1,0 +1,88 @@
+srcdir        := @srcdir@
+duktape_dir   := $(srcdir)/vendor/duktape/
+
+CC            := @CC@
+AR            := @AR@
+RANLIB        := @RANLIB@
+CFLAGS        := @CFLAGS@ @SHOBJFLAGS@
+CPPFLAGS      := -I. -I$(srcdir) -I$(duktape_dir) @CPPFLAGS@ @SHOBJCPPFLAGS@ @DEFS@ @TCL_DEFS@
+LDFLAGS       := @LDFLAGS@
+LIBS          := @LIBS@
+SHOBJLDFLAGS  := @SHOBJLDFLAGS@
+VPATH         := $(srcdir)
+prefix        := @prefix@
+exec_prefix   := @exec_prefix@
+libdir        := @libdir@
+TCL_DUKTAPE_AMALGAMATION := @TCL_DUKTAPE_AMALGAMATION@
+PACKAGE_VERSION       := @PACKAGE_VERSION@
+TCL_PACKAGE_PATH      := @TCL_PACKAGE_PATH@
+PACKAGE_INSTALL_DIR   := $(TCL_PACKAGE_PATH)/tclduktape-$(PACKAGE_VERSION)
+INSTALL               := @INSTALL@
+INSTALL_PROGRAM       := @INSTALL_PROGRAM@
+INSTALL_DATA          := @INSTALL_DATA@
+export CC CFLAGS CPPFLAGS
+
+all: @EXTENSION_TARGET@ pkgIndex.tcl
+
+ifneq ($(TCL_DUKTAPE_AMALGAMATION),1)
+TCL_DUKTAPE_OBJECTS = duktape.o tcl-duktape.o
+else
+TCL_DUKTAPE_OBJECTS = tcl-duktape-amalgamation.o
+endif
+
+ifeq (@TCLEXT_BUILD@,shared)
+@EXTENSION_TARGET@: $(TCL_DUKTAPE_OBJECTS) Makefile
+	rm -f @EXTENSION_TARGET@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $(SHOBJLDFLAGS) -o @EXTENSION_TARGET@ $(TCL_DUKTAPE_OBJECTS) $(LIBS)
+	-@WEAKENSYMS@ @EXTENSION_TARGET@
+	-@REMOVESYMS@ @EXTENSION_TARGET@
+else
+@EXTENSION_TARGET@: $(TCL_DUKTAPE_OBJECTS) Makefile
+	rm -f @EXTENSION_TARGET@
+	$(AR) rc @EXTENSION_TARGET@ $(TCL_DUKTAPE_OBJECTS)
+	-$(RANLIB) @EXTENSION_TARGET@
+endif
+
+# The amalgamation is used when compiling statically so that the same ABI can be exposed
+# to upstream projects rather than requiring them to filter out our symbols
+tcl-duktape-amalgamation.c: $(srcdir)/lib/tcl-duktape.c $(duktape_dir)duktape.c Makefile
+	rm -f tcl-duktape-amalgamation.c
+	cat $(duktape_dir)duktape.c $(srcdir)/lib/tcl-duktape.c > tcl-duktape-amalgamation.c.new
+	mv tcl-duktape-amalgamation.c.new tcl-duktape-amalgamation.c
+
+tcl-duktape-amalgamation.o: tcl-duktape-amalgamation.c $(duktape_dir)duktape.h $(duktape_dir)duk_config.h Makefile
+	$(CC) $(CPPFLAGS) -DTCL_DUKTAPE_AMALGAMATION=1 $(CFLAGS) -o tcl-duktape-amalgamation.o -c tcl-duktape-amalgamation.c
+ifneq (@TCLEXT_BUILD@,shared)
+	-@WEAKENSYMS@ tcl-duktape-amalgamation.o
+	-@REMOVESYMS@ tcl-duktape-amalgamation.o
+endif
+
+tcl-duktape.o: $(srcdir)/lib/tcl-duktape.c $(duktape_dir)duktape.h $(duktape_dir)duk_config.h Makefile
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o tcl-duktape.o -c $(srcdir)/lib/tcl-duktape.c
+
+duktape.o: $(duktape_dir)duktape.c $(duktape_dir)duktape.h $(duktape_dir)duk_config.h Makefile
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o duktape.o -c $(duktape_dir)duktape.c
+
+test: @EXTENSION_TARGET@ $(srcdir)/tests.tcl pkgIndex.tcl
+	TCLLIBPATH="." $(srcdir)/tests.tcl
+
+install: @EXTENSION_TARGET@ pkgIndex.tcl
+	$(INSTALL) -d '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
+	$(INSTALL_PROGRAM) @EXTENSION_TARGET@ '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
+	$(INSTALL_DATA)    pkgIndex.tcl '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
+ 
+clean:
+	rm -f @EXTENSION_TARGET@ tcl-duktape.o duktape.o
+	rm -f tcl-duktape-amalgamation.c tcl-duktape-amalgamationc.new
+	rm -f tcl-duktape-amalgamation.o
+
+distclean: clean
+	rm -f Makefile libtclduktape.syms
+	rm -f pkgIndex.tcl
+	rm -f config.log config.status
+
+mrproper: distclean
+	rm -f $(srcdir)/configure $(srcdir)/aclocal.m4 $(srcdir)/config.guess $(srcdir)/config.sub $(srcdir)/install-sh
+	rm -f $(srcdir)/libtclduktape.vers
+
+.PHONY: all test clean distclean mrproper
