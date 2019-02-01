@@ -6,12 +6,12 @@
  * LICENSE for details.
  */
 #include <tcl.h>
-#include "../vendor/duktape/duktape.h"
+#include "duktape.h"
 
 /* Package information. */
 
 #define PACKAGE "duktape"
-#define VERSION "0.5.0"
+#define VERSION PACKAGE_VERSION
 
 /* Namespace for the extension. */
 
