@@ -1,7 +1,5 @@
 # tcl-duktape
 
-[![Build Status](https://travis-ci.org/dbohdan/tcl-duktape.svg)](https://travis-ci.org/dbohdan/tcl-duktape)
-
 This Tcl extension provides bindings for [Duktape](http://duktape.org/),
 a JavaScript interpreter library.
 
