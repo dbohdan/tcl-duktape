@@ -12,11 +12,11 @@ commands=(
 )
 
 urls=(
-	http://chiselapp.com/user/rkeene/repository/autoconf/doc/trunk/tcl.m4
-	http://chiselapp.com/user/rkeene/repository/autoconf/doc/trunk/shobj.m4
-	http://chiselapp.com/user/rkeene/repository/autoconf/doc/trunk/versionscript.m4
-	'http://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_check_compile_flag.m4'
-	'http://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_check_link_flag.m4'
+	https://chiselapp.com/user/rkeene/repository/autoconf/doc/trunk/tcl.m4
+	https://chiselapp.com/user/rkeene/repository/autoconf/doc/trunk/shobj.m4
+	https://chiselapp.com/user/rkeene/repository/autoconf/doc/trunk/versionscript.m4
+	'https://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_check_compile_flag.m4'
+	'https://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_check_link_flag.m4'
 )
 
 localFiles=(
