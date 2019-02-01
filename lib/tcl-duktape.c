@@ -321,9 +321,11 @@ Tclduktape_Init(Tcl_Interp *interp)
     Tcl_Namespace *nsPtr;
     struct DuktapeData *duktape_data;
 
+#ifdef USE_TCL_STUBS
     if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
         return TCL_ERROR;
     }
+#endif
 
     duktape_data = (struct DuktapeData *) ckalloc(sizeof(struct DuktapeData));
 
