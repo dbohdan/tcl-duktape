@@ -320,11 +320,12 @@ Tclduktape_Init(Tcl_Interp *interp)
 {
     Tcl_Namespace *nsPtr;
     struct DuktapeData *duktape_data;
-    duktape_data = (struct DuktapeData *) ckalloc(sizeof(struct DuktapeData));
 
     if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
         return TCL_ERROR;
     }
+
+    duktape_data = (struct DuktapeData *) ckalloc(sizeof(struct DuktapeData));
 
     /* Create the namespace. */
     if (Tcl_FindNamespace(interp, NS, NULL, 0) == NULL) {
