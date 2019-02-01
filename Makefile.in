@@ -63,18 +63,29 @@ tcl-duktape.o: $(srcdir)/lib/tcl-duktape.c $(duktape_dir)duktape.h $(duktape_dir
 duktape.o: $(duktape_dir)duktape.c $(duktape_dir)duktape.h $(duktape_dir)duk_config.h Makefile
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o duktape.o -c $(duktape_dir)duktape.c
 
-test: @EXTENSION_TARGET@ $(srcdir)/tests.tcl pkgIndex.tcl
+utils.tcl: $(srcdir)/lib/utils.tcl
+	rm -f utils.tcl utils.tcl.new
+	cp $(srcdir)/lib/utils.tcl utils.tcl.new
+	mv utils.tcl.new utils.tcl
+
+oo.tcl: $(srcdir)/lib/oo.tcl
+	rm -f oo.tcl oo.tcl.new
+	cp $(srcdir)/lib/oo.tcl oo.tcl.new
+	mv oo.tcl.new oo.tcl
+
+test: @EXTENSION_TARGET@ $(srcdir)/tests.tcl utils.tcl oo.tcl pkgIndex.tcl
 	TCLLIBPATH="." $(srcdir)/tests.tcl
 
-install: @EXTENSION_TARGET@ pkgIndex.tcl
+install: @EXTENSION_TARGET@ pkgIndex.tcl utils.tcl oo.tcl
 	$(INSTALL) -d '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
 	$(INSTALL_PROGRAM) @EXTENSION_TARGET@ '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
-	$(INSTALL_DATA)    pkgIndex.tcl '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
+	$(INSTALL_DATA)    pkgIndex.tcl oo.tcl utils.tcl '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
  
 clean:
 	rm -f @EXTENSION_TARGET@ tcl-duktape.o duktape.o
 	rm -f tcl-duktape-amalgamation.c tcl-duktape-amalgamationc.new
 	rm -f tcl-duktape-amalgamation.o
+	rm -f utils.tcl utils.tcl.new oo.tcl oo.tcl.new
 
 distclean: clean
 	rm -f Makefile libtclduktape.syms
