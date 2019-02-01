@@ -78,6 +78,13 @@ install: @EXTENSION_TARGET@ pkgIndex.tcl $(srcdir)/lib/utils.tcl $(srcdir)/lib/o
 	$(INSTALL) -d '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
 	$(INSTALL_PROGRAM) @EXTENSION_TARGET@ '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
 	$(INSTALL_DATA)    pkgIndex.tcl $(srcdir)/lib/oo.tcl $(srcdir)/lib/utils.tcl '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
+
+uninstall:
+	rm -f '$(DESTDIR)$(PACKAGE_INSTALL_DIR)/@EXTENSION_TARGET@'
+	rm -f '$(DESTDIR)$(PACKAGE_INSTALL_DIR)/pkgIndex.tcl'
+	rm -f '$(DESTDIR)$(PACKAGE_INSTALL_DIR)/oo.tcl'
+	rm -f '$(DESTDIR)$(PACKAGE_INSTALL_DIR)/utils.tcl'
+	rmdir '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
  
 clean:
 	rm -f @EXTENSION_TARGET@ tcl-duktape.o duktape.o
@@ -94,4 +101,4 @@ mrproper: distclean
 	rm -f $(srcdir)/configure $(srcdir)/aclocal.m4 $(srcdir)/config.guess $(srcdir)/config.sub $(srcdir)/install-sh
 	rm -f $(srcdir)/libtclduktape.vers
 
-.PHONY: all test install clean distclean mrproper
+.PHONY: all test install uninstall clean distclean mrproper
