@@ -7,7 +7,7 @@
 package require tcltest
 
 namespace eval ::duktape::tests {
-    variable path [file dirname [file dirname [file normalize $argv0/___]]]
+    variable path [pwd]
     variable setup [list apply {{path} {
         lappend ::auto_path $path
         package require duktape

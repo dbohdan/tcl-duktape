@@ -74,7 +74,7 @@ oo.tcl: $(srcdir)/lib/oo.tcl
 	mv oo.tcl.new oo.tcl
 
 test: @EXTENSION_TARGET@ $(srcdir)/tests.tcl utils.tcl oo.tcl pkgIndex.tcl
-	TCLLIBPATH="." $(srcdir)/tests.tcl
+	$(srcdir)/tests.tcl
 
 install: @EXTENSION_TARGET@ pkgIndex.tcl utils.tcl oo.tcl
 	$(INSTALL) -d '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
