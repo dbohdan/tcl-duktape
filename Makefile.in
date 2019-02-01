@@ -74,10 +74,10 @@ oo.tcl: $(srcdir)/lib/oo.tcl
 test: @EXTENSION_TARGET@ $(srcdir)/tests.tcl utils.tcl oo.tcl pkgIndex.tcl
 	$(srcdir)/tests.tcl
 
-install: @EXTENSION_TARGET@ pkgIndex.tcl utils.tcl oo.tcl
+install: @EXTENSION_TARGET@ pkgIndex.tcl $(srcdir)/lib/utils.tcl $(srcdir)/lib/oo.tcl
 	$(INSTALL) -d '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
 	$(INSTALL_PROGRAM) @EXTENSION_TARGET@ '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
-	$(INSTALL_DATA)    pkgIndex.tcl oo.tcl utils.tcl '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
+	$(INSTALL_DATA)    pkgIndex.tcl $(srcdir)/lib/oo.tcl $(srcdir)/lib/utils.tcl '$(DESTDIR)$(PACKAGE_INSTALL_DIR)'
  
 clean:
 	rm -f @EXTENSION_TARGET@ tcl-duktape.o duktape.o
