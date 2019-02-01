@@ -64,14 +64,12 @@ duktape.o: $(duktape_dir)duktape.c $(duktape_dir)duktape.h $(duktape_dir)duk_con
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o duktape.o -c $(duktape_dir)duktape.c
 
 utils.tcl: $(srcdir)/lib/utils.tcl
-	rm -f utils.tcl utils.tcl.new
-	cp $(srcdir)/lib/utils.tcl utils.tcl.new
-	mv utils.tcl.new utils.tcl
+	rm -f utils.tcl
+	@LN_S@ $(srcdir)/lib/utils.tcl .
 
 oo.tcl: $(srcdir)/lib/oo.tcl
-	rm -f oo.tcl oo.tcl.new
-	cp $(srcdir)/lib/oo.tcl oo.tcl.new
-	mv oo.tcl.new oo.tcl
+	rm -f oo.tcl
+	@LN_S@ $(srcdir)/lib/oo.tcl .
 
 test: @EXTENSION_TARGET@ $(srcdir)/tests.tcl utils.tcl oo.tcl pkgIndex.tcl
 	$(srcdir)/tests.tcl
@@ -85,7 +83,7 @@ clean:
 	rm -f @EXTENSION_TARGET@ tcl-duktape.o duktape.o
 	rm -f tcl-duktape-amalgamation.c tcl-duktape-amalgamationc.new
 	rm -f tcl-duktape-amalgamation.o
-	rm -f utils.tcl utils.tcl.new oo.tcl oo.tcl.new
+	rm -f utils.tcl oo.tcl
 
 distclean: clean
 	rm -f Makefile libtclduktape.syms
