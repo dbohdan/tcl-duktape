@@ -12,6 +12,6 @@ package ifneeded "duktape" @PACKAGE_VERSION@ [list apply {dir {
     }
     uplevel 1 [list source [file join $dir utils.tcl]]
 }} $dir]
-package ifneeded "duktape::oo" 0.5.0 [list apply {dir {
+package ifneeded "duktape::oo" 0.6.0 [list apply {dir {
     uplevel 1 [list source [file join $dir oo.tcl]]
 }} $dir]
