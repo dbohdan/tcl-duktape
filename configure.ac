@@ -7,6 +7,7 @@ AC_PROG_CC_C99
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 AC_GNU_SOURCE
+AC_PROG_LN_S
 
 dnl Monocypher requires C99
 if test "$ac_cv_prog_cc_c99" = no; then
