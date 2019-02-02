@@ -1,5 +1,7 @@
 # tcl-duktape
 
+[![CircleCI](https://circleci.com/gh/dbohdan/tcl-duktape.svg?style=svg)](https://circleci.com/gh/dbohdan/tcl-duktape)
+
 This Tcl extension provides bindings for [Duktape](http://duktape.org/),
 a JavaScript interpreter library.
 
