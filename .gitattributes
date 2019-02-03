@@ -1,4 +1,5 @@
-aclocal*      linguist-vendored
+aclocal/*     linguist-vendored
+aclocal.m4    linguist-vendored
 configure     linguist-vendored
 config.guess  linguist-vendored
 config.sub    linguist-vendored
