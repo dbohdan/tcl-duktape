@@ -1,0 +1,6 @@
+{
+	global:
+		Tclduktape_Init;
+	local:
+		*;
+};

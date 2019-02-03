@@ -1,1 +1,5 @@
-aclocal/* linguist-vendored
+aclocal*      linguist-vendored
+configure     linguist-vendored
+config.guess  linguist-vendored
+config.sub    linguist-vendored
+install-sh    linguist-vendored
