@@ -3,7 +3,7 @@ version: 2
 jobs:
   autogen_build:
     docker:
-      - image: dbohdan1/circleci-tcl-gcc-autoconf:0.2.0.17-master
+      - image: dbohdan1/circleci-tcl-gcc-autoconf:0.3.0.27-master
     steps:
       - checkout
       - run: ./autogen.sh
@@ -11,7 +11,7 @@ jobs:
       - run: make test
   committed_configure_build:
     docker:
-      - image: dbohdan1/circleci-tcl-gcc-autoconf:0.2.0.17-master
+      - image: dbohdan1/circleci-tcl-gcc-autoconf:0.3.0.27-master
     steps:
       - checkout
       - run: ./configure
