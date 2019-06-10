@@ -385,7 +385,7 @@ static duk_ret_t EvalTclCmdFromJS(duk_context *ctx) {
 
 	duk_push_current_function(ctx);          /* => [args...] [function] */
 	duk_push_literal(ctx, "apply");          /* => [args...] [function] ["apply"] */
-	duk_get_prop_string(ctx, -2, "lambda");  /* => [args...] [function] ["apply"] [lambda] */
+	duk_get_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda"));  /* => [args...] [function] ["apply"] [lambda] */
 	duk_insert(ctx, 0);                      /* => [lambda] [args...] [function] ["apply"] */
 	duk_insert(ctx, 0);                      /* => ["apply"] [lambda] [args...] [function] */
 	duk_pop(ctx);                            /* => ["apply"] [lambda] [args...] */
@@ -415,12 +415,12 @@ static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, 
 	lambdaString = Tcl_GetStringFromObj(lambdaObj, &lambdaStringLength);
 	Tcl_DecrRefCount(lambdaObj);
 
-	duk_push_global_object(ctx);                              /* => [global] */
-	duk_push_c_function(ctx, EvalTclCmdFromJS, DUK_VARARGS);  /* => [global] [function] */
-	duk_push_lstring(ctx, lambdaString, lambdaStringLength);  /* => [global] [function] [lambda] */
-	duk_put_prop_string(ctx, -2, "lambda");                   /* => [global] [function] */
-	duk_put_prop_string(ctx, -2, functionName);               /* => [global] */
-	duk_pop(ctx);                                             /* => */
+	duk_push_global_object(ctx);                               /* => [global] */
+	duk_push_c_function(ctx, EvalTclCmdFromJS, DUK_VARARGS);   /* => [global] [function] */
+	duk_push_lstring(ctx, lambdaString, lambdaStringLength);   /* => [global] [function] [lambda] */
+	duk_put_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda")); /* => [global] [function] */
+	duk_put_prop_string(ctx, -2, functionName);                /* => [global] */
+	duk_pop(ctx);                                              /* => */
 
 	return(TCL_OK);
 }
