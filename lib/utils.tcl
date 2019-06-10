@@ -73,3 +73,25 @@ proc ::duktape::jsproc {id name arguments body} {
         ::duktape::call $id $jsName {*}$callArgs
     }} $id $jsName $arguments]]
 }
+
+# Create a JavaScript function with Tcl code
+proc ::duktape::tclfunction {token name argInfo code} {
+	set argInfoJS [join $argInfo {, }]
+
+	set codeJS [list apply [list $argInfo $code]]
+	set codeJS [lmap item $codeJS {
+		set item [string map [list \n "' + \"\\n\" + '" \\ \\\\ ' \\'] $item]
+		set item "'$item'"
+		set item
+	}]
+	set codeJS [join $codeJS {, }]
+
+	set jsFunction ""
+	append jsFunction "function ${name}($argInfoJS) \{\n"
+	append jsFunction "\tvar ret;\n"
+	append jsFunction "\tret = Duktape.tcl.eval($codeJS, $argInfoJS);\n"
+	append jsFunction "\treturn(ret);\n"
+	append jsFunction "\}"
+
+	::duktape::eval $token $jsFunction
+}

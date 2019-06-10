@@ -29,6 +29,10 @@
 #define ERROR_TOKEN "can't parse token"
 #define ERROR_ARG_LENGTH "argument must be a list of one or two elements"
 #define ERROR_CREATE "can't create Duktape context"
+#define ERROR_INVALID_INSTANCE "unable to locate instance"
+#define ERROR_INVALID_STRING "unable to convert argument to string"
+#define ERROR_INTERNAL_ARGS_ERROR "internal error: negative arguments?"
+#define ERROR_INTERNAL_TCL_LAPPEND "internal error: lappend failed?"
 
 /* Usage. */
 
@@ -45,6 +49,11 @@ struct DuktapeData
     Tcl_HashTable table;
 };
 
+struct DuktapeInstanceData {
+    Tcl_Interp *interp;
+    duk_context *ctx;
+};
+
 #define DUKTCL_CDATA ((struct DuktapeData *) cdata)
 
 /* Functions */
@@ -52,6 +61,7 @@ struct DuktapeData
 static duk_context *
 parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
 {
+    struct DuktapeInstanceData *instanceData;
     duk_context *ctx;
     Tcl_HashEntry *hashPtr;
 
@@ -60,9 +70,15 @@ parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
         Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_TOKEN, -1));
         return NULL;
     }
-    ctx = (duk_context *) Tcl_GetHashValue(hashPtr);
+    instanceData = (struct DuktapeInstanceData *) Tcl_GetHashValue(hashPtr);
+    if (!instanceData) {
+        Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_INVALID_INSTANCE, -1));
+        return(NULL);
+    }
+    ctx = instanceData->ctx;
     if (del) {
         Tcl_DeleteHashEntry(hashPtr);
+        ckfree(instanceData);
     }
     return ctx;
 }
@@ -70,19 +86,90 @@ parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
 static void
 cleanup_interp(ClientData cdata, Tcl_Interp *interp)
 {
+    struct DuktapeInstanceData *instanceData;
     Tcl_HashEntry* hashPtr;
     Tcl_HashSearch search;
     duk_context* ctx;
 
     hashPtr = Tcl_FirstHashEntry(&DUKTCL_CDATA->table, &search);
     while (hashPtr != NULL) {
-        ctx = (duk_context *) Tcl_GetHashValue(hashPtr);
+        instanceData = (struct DuktapeInstanceData *) Tcl_GetHashValue(hashPtr);
+        ctx = instanceData->ctx;
         Tcl_SetHashValue(hashPtr, (ClientData) NULL);
         duk_destroy_heap(ctx);
+        ckfree(instanceData);
         hashPtr = Tcl_NextHashEntry(&search);
     }
     Tcl_DeleteHashTable(&DUKTCL_CDATA->table);
     ckfree((char *)DUKTCL_CDATA);
+}
+
+/*
+ * Evaluate a Tcl string and return the result to JavaScript
+ */
+static duk_ret_t EvalTclFromJS(duk_context *ctx) {
+	struct DuktapeInstanceData *instanceData;
+	duk_memory_functions funcs;
+	Tcl_Interp *interp;
+	Tcl_Obj *evalScript, *evalResult, *dukStringObj;
+	duk_size_t dukStringLength;
+	const char *dukString;
+	char *evalResultString;
+	duk_idx_t numArgs;
+	int evalResultStringLength;
+	int tclRet;
+	int idx;
+
+	duk_get_memory_functions(ctx, &funcs);
+	instanceData = funcs.udata;
+
+	if (!instanceData) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INSTANCE);
+		return(duk_throw(ctx));
+	}
+	interp = instanceData->interp;
+
+	numArgs = duk_get_top(ctx);
+	if (numArgs < 0) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INTERNAL_ARGS_ERROR);
+		return(duk_throw(ctx));
+	}
+
+	evalScript = Tcl_NewListObj(0, NULL);
+	for (idx = 0; idx < numArgs; idx++) {
+		dukString = duk_to_lstring(ctx, idx, &dukStringLength);
+		if (!dukString) {
+			duk_push_error_object(ctx, DUK_ERR_TYPE_ERROR, "%s", ERROR_INVALID_STRING);
+			return(duk_throw(ctx));
+		}
+
+		/* XXX:TODO: Encoding */
+		dukStringObj = Tcl_NewStringObj(dukString, dukStringLength);
+
+		tclRet = Tcl_ListObjAppendElement(interp, evalScript, dukStringObj);
+		if (tclRet != TCL_OK) {
+			duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INTERNAL_TCL_LAPPEND);
+			return(duk_throw(ctx));
+		}
+	}
+	for (idx = 0; idx < numArgs; idx++) {
+		duk_pop(ctx);
+	}
+
+	tclRet = Tcl_EvalObjEx(interp, evalScript, 0);
+	if (tclRet != TCL_OK) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", Tcl_GetStringResult(interp));
+		return(duk_throw(ctx));
+	}
+
+	evalResult = Tcl_GetObjResult(interp);
+
+	evalResultString = Tcl_GetStringFromObj(evalResult, &evalResultStringLength);
+	duk_push_lstring(ctx, evalResultString, evalResultStringLength);
+
+	Tcl_FreeResult(interp);
+
+	return(1);
 }
 
 /*
@@ -93,6 +180,7 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
 static int
 Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
+    struct DuktapeInstanceData *instanceData;
     duk_context *ctx;
     Tcl_HashEntry *hashPtr;
     int isNew;
@@ -103,17 +191,38 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
         return TCL_ERROR;
     }
 
-    ctx = duk_create_heap_default();
+    instanceData = ckalloc(sizeof(*instanceData));
+    instanceData->interp = interp;
+
+    ctx = duk_create_heap(NULL, NULL, NULL, instanceData, NULL);
     if (ctx == NULL) {
         Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_CREATE, -1));
+        free(instanceData);
         return TCL_ERROR;
     }
+
+    instanceData->ctx = ctx;
 
     DUKTCL_CDATA->counter++;
     token = Tcl_ObjPrintf(NS "::%d", DUKTCL_CDATA->counter);
     hashPtr = Tcl_CreateHashEntry(&DUKTCL_CDATA->table, Tcl_GetString(token),
             &isNew);
-    Tcl_SetHashValue(hashPtr, (ClientData) ctx);
+    Tcl_SetHashValue(hashPtr, (ClientData) instanceData);
+
+    duk_push_global_object(ctx);       /* [global] */
+    duk_push_string(ctx, "Duktape");   /* [global] ["duktape"] */
+    duk_get_prop(ctx, -2);             /* [global] [duktape] */
+    if (duk_is_object(ctx, -1)) {
+        duk_push_string(ctx, "tcl");   /* [global] [duktape] ["tcl"] */
+        duk_push_object(ctx);          /* [global] [duktape] ["tcl"] [object] */
+        duk_push_string(ctx, "eval");  /* [global] [duktape] ["tcl"] [object] ["eval"] */
+        duk_push_c_function(ctx, EvalTclFromJS, DUK_VARARGS);
+                                       /* [global] [duktape] ["tcl"] [object] ["eval"] [function] */
+        duk_put_prop(ctx, -3);         /* [global] [duktape] ["tcl"] [object.eval=function] */
+        duk_put_prop(ctx, -3);         /* [global] [duktape.tcl=object] */
+    }
+    duk_pop(ctx);                      /* [global] */
+    duk_pop(ctx);                      /* */
 
     Tcl_SetObjResult(interp, token);
     return TCL_OK;
