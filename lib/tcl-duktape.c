@@ -137,7 +137,27 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx) {
 
 	evalScript = Tcl_NewListObj(0, NULL);
 	for (idx = 0; idx < numArgs; idx++) {
-		dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
+		/*
+		 * XXX:TODO: Convert types ?
+		 *     object          => dict ?  or JSON ?
+		 *     array           => list ?  or JSON ?
+		 *     null/undefined  => empty string ?
+		 *     everything else => string
+		 */
+		dukString = NULL;
+		if (duk_check_type_mask(ctx, idx, DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_UNDEFINED)) {
+			dukString = "";
+			dukStringLength = 0;
+		}
+
+		if (duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
+			duk_json_encode(ctx, idx);
+		}
+
+		if (!dukString) {
+			dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
+		}
+
 		if (!dukString) {
 			duk_push_error_object(ctx, DUK_ERR_TYPE_ERROR, "%s", ERROR_INVALID_STRING);
 			return(duk_throw(ctx));
