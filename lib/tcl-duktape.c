@@ -24,6 +24,7 @@
 #define MAKEUNSAFE "::makeunsafe"
 #define CLOSE "::close"
 #define EVAL "::eval"
+#define TCLFUNCTION "::tclfunction"
 #define CALL_METHOD "::call-method"
 
 /* Error messages. */
@@ -36,6 +37,7 @@
 #define ERROR_INVALID_STRING "unable to convert argument to string"
 #define ERROR_INTERNAL_ARGS_ERROR "internal error: negative arguments?"
 #define ERROR_INTERNAL_TCL_LAPPEND "internal error: lappend failed?"
+#define ERROR_NOT_ALLOWED "action not permitted while safe"
 
 /* Usage. */
 
@@ -44,6 +46,7 @@
 #define USAGE_MAKEUNSAFE "token"
 #define USAGE_CLOSE "token"
 #define USAGE_EVAL "token code"
+#define USAGE_TCLFUNCTION "token name args body"
 #define USAGE_CALL_METHOD "token method this ?{arg ?type?}? ..."
 
 /* Data types. */
@@ -55,8 +58,9 @@ struct DuktapeData
 };
 
 struct DuktapeInstanceData {
-    Tcl_Interp *interp;
-    duk_context *ctx;
+	Tcl_Interp *interp;
+	duk_context *ctx;
+	int isUnsafe;
 };
 
 #define DUKTCL_CDATA ((struct DuktapeData *) cdata)
@@ -115,32 +119,15 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
 /*
  * Evaluate a Tcl string and return the result to JavaScript
  */
-static duk_ret_t EvalTclFromJS(duk_context *ctx) {
-	struct DuktapeInstanceData *instanceData;
-	duk_memory_functions funcs;
-	Tcl_Interp *interp;
+static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx) {
 	Tcl_Obj *evalScript, *evalResult, *dukStringObj;
 	duk_size_t dukStringLength;
+	duk_idx_t numArgs;
 	const char *dukString;
 	char *evalResultString;
-	duk_idx_t numArgs;
 	int evalResultStringLength;
 	int tclRet;
 	int idx;
-
-	duk_get_memory_functions(ctx, &funcs);
-	instanceData = funcs.udata;
-
-	if (!instanceData) {
-		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INSTANCE);
-		return(duk_throw(ctx));
-	}
-	interp = instanceData->interp;
-
-	if (!interp) {
-		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INTERP);
-		return(duk_throw(ctx));
-	}
 
 	numArgs = duk_get_top(ctx);
 	if (numArgs < 0) {
@@ -150,7 +137,7 @@ static duk_ret_t EvalTclFromJS(duk_context *ctx) {
 
 	evalScript = Tcl_NewListObj(0, NULL);
 	for (idx = 0; idx < numArgs; idx++) {
-		dukString = duk_to_lstring(ctx, idx, &dukStringLength);
+		dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
 		if (!dukString) {
 			duk_push_error_object(ctx, DUK_ERR_TYPE_ERROR, "%s", ERROR_INVALID_STRING);
 			return(duk_throw(ctx));
@@ -185,14 +172,41 @@ static duk_ret_t EvalTclFromJS(duk_context *ctx) {
 	return(1);
 }
 
-static void MakeContextUnsafe(Tcl_Interp *interp, duk_context *ctx) {
+static duk_ret_t EvalTclFromJS(duk_context *ctx) {
+	struct DuktapeInstanceData *instanceData;
+	duk_memory_functions funcs;
+	Tcl_Interp *interp;
+
+	duk_get_memory_functions(ctx, &funcs);
+	instanceData = funcs.udata;
+
+	if (!instanceData->isUnsafe) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_NOT_ALLOWED);
+		return(duk_throw(ctx));
+	}
+
+	if (!instanceData) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INSTANCE);
+		return(duk_throw(ctx));
+	}
+	interp = instanceData->interp;
+
+	if (!interp) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INTERP);
+		return(duk_throw(ctx));
+	}
+
+	return(EvalTclFromJSWithInterp(interp, ctx));
+}
+
+static void MakeContextUnsafe(duk_context *ctx) {
 	struct DuktapeInstanceData *instanceData;
 	duk_memory_functions funcs;
 
 	duk_get_memory_functions(ctx, &funcs);
 	instanceData = funcs.udata;
 
-	instanceData->interp = interp;
+	instanceData->isUnsafe = 1;
 
 	duk_push_global_object(ctx);           /* => [global] */
 	duk_push_string(ctx, "Duktape");       /* => [global] ["duktape"] */
@@ -208,17 +222,18 @@ static void MakeContextUnsafe(Tcl_Interp *interp, duk_context *ctx) {
 	}
 	duk_pop(ctx);                          /* => [global] */
 	duk_pop(ctx);                          /* => */
+
 	return;
 }
 
-static void MakeContextSafe(Tcl_Interp *interp, duk_context *ctx) {
+static void MakeContextSafe(duk_context *ctx) {
 	struct DuktapeInstanceData *instanceData;
 	duk_memory_functions funcs;
 
 	duk_get_memory_functions(ctx, &funcs);
 	instanceData = funcs.udata;
 
-	instanceData->interp = NULL;
+	instanceData->isUnsafe = 0;
 
 	duk_push_global_object(ctx);           /* => [global] */
 	duk_push_string(ctx, "Duktape");       /* => [global] ["duktape"] */
@@ -229,9 +244,8 @@ static void MakeContextSafe(Tcl_Interp *interp, duk_context *ctx) {
 	}
 	duk_pop(ctx);                          /* => [global] */
 	duk_pop(ctx);                          /* => */
+
 	return;
-	/* UNREACH: Ignore some warnings */
-	interp = interp;
 }
 
 /*
@@ -267,7 +281,7 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     }
 
     instanceData = ckalloc(sizeof(*instanceData));
-    instanceData->interp = NULL;
+    instanceData->interp = interp;
 
     ctx = duk_create_heap(NULL, NULL, NULL, instanceData, NULL);
     if (ctx == NULL) {
@@ -285,7 +299,7 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     Tcl_SetHashValue(hashPtr, (ClientData) instanceData);
 
     if (makeUnsafe) {
-        MakeContextUnsafe(interp, ctx);
+        MakeContextUnsafe(ctx);
     }
 
     Tcl_SetObjResult(interp, token);
@@ -305,7 +319,7 @@ static int MakeSafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj 
 		return(TCL_ERROR);
 	}
 
-	MakeContextSafe(interp, ctx);
+	MakeContextSafe(ctx);
 
 	return(TCL_OK);
 }
@@ -323,7 +337,7 @@ static int MakeUnsafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Ob
 		return(TCL_ERROR);
 	}
 
-	MakeContextUnsafe(interp, ctx);
+	MakeContextUnsafe(ctx);
 
 	return(TCL_OK);
 }
@@ -352,6 +366,65 @@ Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 
     return TCL_OK;
 }
+
+/*
+ * Register a new global function within a context
+ */
+/*
+ * Evaluate a Tcl string and return the result to JavaScript
+ */
+static duk_ret_t EvalTclCmdFromJS(duk_context *ctx) {
+	struct DuktapeInstanceData *instanceData;
+	duk_memory_functions funcs;
+	Tcl_Interp *interp;
+
+	duk_get_memory_functions(ctx, &funcs);
+	instanceData = funcs.udata;
+
+	interp = instanceData->interp;
+
+	duk_push_current_function(ctx);          /* => [args...] [function] */
+	duk_push_literal(ctx, "apply");          /* => [args...] [function] ["apply"] */
+	duk_get_prop_string(ctx, -2, "lambda");  /* => [args...] [function] ["apply"] [lambda] */
+	duk_insert(ctx, 0);                      /* => [lambda] [args...] [function] ["apply"] */
+	duk_insert(ctx, 0);                      /* => ["apply"] [lambda] [args...] [function] */
+	duk_pop(ctx);                            /* => ["apply"] [lambda] [args...] */
+
+	return(EvalTclFromJSWithInterp(interp, ctx));
+}
+
+static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+	duk_context *ctx;
+	Tcl_Obj *lambdaObj;
+	const char *functionName, *lambdaString;
+	int lambdaStringLength;
+
+	if (objc != 5) {
+		Tcl_WrongNumArgs(interp, 1, objv, USAGE_TCLFUNCTION);
+		return(TCL_ERROR);
+	}
+
+	ctx = parse_id(cdata, interp, objv[1], 0);
+	if (ctx == NULL) {
+		return(TCL_ERROR);
+	}
+
+	functionName = Tcl_GetStringFromObj(objv[2], NULL);
+
+        lambdaObj = Tcl_NewListObj(2, objv + 3);
+	lambdaString = Tcl_GetStringFromObj(lambdaObj, &lambdaStringLength);
+	Tcl_DecrRefCount(lambdaObj);
+
+	duk_push_global_object(ctx);                              /* => [global] */
+	duk_push_c_function(ctx, EvalTclCmdFromJS, DUK_VARARGS);  /* => [global] [function] */
+	duk_push_lstring(ctx, lambdaString, lambdaStringLength);  /* => [global] [function] [lambda] */
+	duk_put_prop_string(ctx, -2, "lambda");                   /* => [global] [function] */
+	duk_put_prop_string(ctx, -2, functionName);               /* => [global] */
+	duk_pop(ctx);                                             /* => */
+
+	return(TCL_OK);
+}
+
 
 /*
  * Evaluate a string as Duktape code in the selected heap.
@@ -554,6 +627,7 @@ Tclduktape_Init(Tcl_Interp *interp)
     Tcl_CreateObjCommand(interp, NS MAKEUNSAFE, MakeUnsafe_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS TCLFUNCTION, RegisterFunction_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CALL_METHOD,
             CallMethod_Cmd, duktape_data, NULL);
     Tcl_CallWhenDeleted(interp, cleanup_interp, duktape_data);
