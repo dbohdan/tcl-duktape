@@ -180,15 +180,16 @@ static duk_ret_t EvalTclFromJS(duk_context *ctx) {
 	duk_get_memory_functions(ctx, &funcs);
 	instanceData = funcs.udata;
 
+	if (!instanceData) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INSTANCE);
+		return(duk_throw(ctx));
+	}
+
 	if (!instanceData->isUnsafe) {
 		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_NOT_ALLOWED);
 		return(duk_throw(ctx));
 	}
 
-	if (!instanceData) {
-		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INSTANCE);
-		return(duk_throw(ctx));
-	}
 	interp = instanceData->interp;
 
 	if (!interp) {
