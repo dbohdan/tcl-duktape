@@ -20,6 +20,8 @@
 /* Command names. */
 
 #define INIT "::init"
+#define MAKESAFE "::makesafe"
+#define MAKEUNSAFE "::makeunsafe"
 #define CLOSE "::close"
 #define EVAL "::eval"
 #define CALL_METHOD "::call-method"
@@ -30,13 +32,16 @@
 #define ERROR_ARG_LENGTH "argument must be a list of one or two elements"
 #define ERROR_CREATE "can't create Duktape context"
 #define ERROR_INVALID_INSTANCE "unable to locate instance"
+#define ERROR_INVALID_INTERP "unable to locate interp"
 #define ERROR_INVALID_STRING "unable to convert argument to string"
 #define ERROR_INTERNAL_ARGS_ERROR "internal error: negative arguments?"
 #define ERROR_INTERNAL_TCL_LAPPEND "internal error: lappend failed?"
 
 /* Usage. */
 
-#define USAGE_INIT "?-tcl?"
+#define USAGE_INIT "?-unsafe <boolean>?"
+#define USAGE_MAKESAFE "token"
+#define USAGE_MAKEUNSAFE "token"
 #define USAGE_CLOSE "token"
 #define USAGE_EVAL "token code"
 #define USAGE_CALL_METHOD "token method this ?{arg ?type?}? ..."
@@ -102,6 +107,9 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
     }
     Tcl_DeleteHashTable(&DUKTCL_CDATA->table);
     ckfree((char *)DUKTCL_CDATA);
+    return;
+    /* UNREACH: Disable some warnings */
+    interp = interp;
 }
 
 /*
@@ -128,6 +136,11 @@ static duk_ret_t EvalTclFromJS(duk_context *ctx) {
 		return(duk_throw(ctx));
 	}
 	interp = instanceData->interp;
+
+	if (!interp) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INTERP);
+		return(duk_throw(ctx));
+	}
 
 	numArgs = duk_get_top(ctx);
 	if (numArgs < 0) {
@@ -172,6 +185,55 @@ static duk_ret_t EvalTclFromJS(duk_context *ctx) {
 	return(1);
 }
 
+static void MakeContextUnsafe(Tcl_Interp *interp, duk_context *ctx) {
+	struct DuktapeInstanceData *instanceData;
+	duk_memory_functions funcs;
+
+	duk_get_memory_functions(ctx, &funcs);
+	instanceData = funcs.udata;
+
+	instanceData->interp = interp;
+
+	duk_push_global_object(ctx);           /* => [global] */
+	duk_push_string(ctx, "Duktape");       /* => [global] ["duktape"] */
+	duk_get_prop(ctx, -2);                 /* => [global] [duktape] */
+	if (duk_is_object(ctx, -1)) {
+		duk_push_string(ctx, "tcl");   /* => [global] [duktape] ["tcl"] */
+		duk_push_object(ctx);          /* => [global] [duktape] ["tcl"] [object] */
+		duk_push_string(ctx, "eval");  /* => [global] [duktape] ["tcl"] [object] ["eval"] */
+		duk_push_c_function(ctx, EvalTclFromJS, DUK_VARARGS);
+		                               /* => [global] [duktape] ["tcl"] [object] ["eval"] [function] */
+		duk_put_prop(ctx, -3);         /* => [global] [duktape] ["tcl"] [object.eval=function] */
+		duk_put_prop(ctx, -3);         /* => [global] [duktape.tcl=object] */
+	}
+	duk_pop(ctx);                          /* => [global] */
+	duk_pop(ctx);                          /* => */
+	return;
+}
+
+static void MakeContextSafe(Tcl_Interp *interp, duk_context *ctx) {
+	struct DuktapeInstanceData *instanceData;
+	duk_memory_functions funcs;
+
+	duk_get_memory_functions(ctx, &funcs);
+	instanceData = funcs.udata;
+
+	instanceData->interp = NULL;
+
+	duk_push_global_object(ctx);           /* => [global] */
+	duk_push_string(ctx, "Duktape");       /* => [global] ["duktape"] */
+	duk_get_prop(ctx, -2);                 /* => [global] [duktape] */
+	if (duk_is_object(ctx, -1)) {
+		duk_push_string(ctx, "tcl");   /* => [global] [duktape] ["tcl"] */
+		duk_del_prop(ctx, -2);         /* => [global] [duktape]  */
+	}
+	duk_pop(ctx);                          /* => [global] */
+	duk_pop(ctx);                          /* => */
+	return;
+	/* UNREACH: Ignore some warnings */
+	interp = interp;
+}
+
 /*
  * Initialize a Duktape intepreter.
  * Return value: string token of the form "::duktape::(integer)".
@@ -185,24 +247,27 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     Tcl_HashEntry *hashPtr;
     int isNew;
     Tcl_Obj *token;
-    int includeTcl = 0;
+    int makeUnsafe = 0;
+    int tclRet;
 
-    if (objc < 1 || objc > 2) {
+    if (objc != 1 && objc != 3) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_INIT);
         return TCL_ERROR;
     }
 
-    if (objc == 2) {
-        if (strcmp(Tcl_GetStringFromObj(objv[1], NULL), "-tcl") == 0) {
-            includeTcl = 1;
-        } else {
+    if (objc == 3) {
+        if (strcmp(Tcl_GetStringFromObj(objv[1], NULL), "-unsafe") != 0) {
             Tcl_WrongNumArgs(interp, 1, objv, USAGE_INIT);
             return TCL_ERROR;
+        }
+        tclRet = Tcl_GetBoolean(interp, Tcl_GetStringFromObj(objv[2], NULL), &makeUnsafe);
+        if (tclRet != TCL_OK) {
+            return(tclRet);
         }
     }
 
     instanceData = ckalloc(sizeof(*instanceData));
-    instanceData->interp = interp;
+    instanceData->interp = NULL;
 
     ctx = duk_create_heap(NULL, NULL, NULL, instanceData, NULL);
     if (ctx == NULL) {
@@ -219,25 +284,48 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
             &isNew);
     Tcl_SetHashValue(hashPtr, (ClientData) instanceData);
 
-    if (includeTcl) {
-        duk_push_global_object(ctx);       /* [global] */
-        duk_push_string(ctx, "Duktape");   /* [global] ["duktape"] */
-        duk_get_prop(ctx, -2);             /* [global] [duktape] */
-        if (duk_is_object(ctx, -1)) {
-            duk_push_string(ctx, "tcl");   /* [global] [duktape] ["tcl"] */
-            duk_push_object(ctx);          /* [global] [duktape] ["tcl"] [object] */
-            duk_push_string(ctx, "eval");  /* [global] [duktape] ["tcl"] [object] ["eval"] */
-            duk_push_c_function(ctx, EvalTclFromJS, DUK_VARARGS);
-                                           /* [global] [duktape] ["tcl"] [object] ["eval"] [function] */
-            duk_put_prop(ctx, -3);         /* [global] [duktape] ["tcl"] [object.eval=function] */
-            duk_put_prop(ctx, -3);         /* [global] [duktape.tcl=object] */
-        }
-        duk_pop(ctx);                      /* [global] */
-        duk_pop(ctx);                      /* */
+    if (makeUnsafe) {
+        MakeContextUnsafe(interp, ctx);
     }
 
     Tcl_SetObjResult(interp, token);
     return TCL_OK;
+}
+
+static int MakeSafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+	duk_context *ctx;
+
+	if (objc != 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKESAFE);
+		return(TCL_ERROR);
+	}
+
+	ctx = parse_id(cdata, interp, objv[1], 0);
+	if (!ctx) {
+		return(TCL_ERROR);
+	}
+
+	MakeContextSafe(interp, ctx);
+
+	return(TCL_OK);
+}
+
+static int MakeUnsafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+	duk_context *ctx;
+
+	if (objc != 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKEUNSAFE);
+		return(TCL_ERROR);
+	}
+
+	ctx = parse_id(cdata, interp, objv[1], 0);
+	if (!ctx) {
+		return(TCL_ERROR);
+	}
+
+	MakeContextUnsafe(interp, ctx);
+
+	return(TCL_OK);
 }
 
 /*
@@ -462,6 +550,8 @@ Tclduktape_Init(Tcl_Interp *interp)
     Tcl_InitHashTable(&duktape_data->table, TCL_STRING_KEYS);
 
     Tcl_CreateObjCommand(interp, NS INIT, Init_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS MAKESAFE, MakeSafe_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS MAKEUNSAFE, MakeUnsafe_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CALL_METHOD,
