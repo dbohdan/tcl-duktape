@@ -36,7 +36,7 @@
 
 /* Usage. */
 
-#define USAGE_INIT ""
+#define USAGE_INIT "?-tcl?"
 #define USAGE_CLOSE "token"
 #define USAGE_EVAL "token code"
 #define USAGE_CALL_METHOD "token method this ?{arg ?type?}? ..."
@@ -185,10 +185,20 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     Tcl_HashEntry *hashPtr;
     int isNew;
     Tcl_Obj *token;
+    int includeTcl = 0;
 
-    if (objc != 1) {
+    if (objc < 1 || objc > 2) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_INIT);
         return TCL_ERROR;
+    }
+
+    if (objc == 2) {
+        if (strcmp(Tcl_GetStringFromObj(objv[1], NULL), "-tcl") == 0) {
+            includeTcl = 1;
+        } else {
+            Tcl_WrongNumArgs(interp, 1, objv, USAGE_INIT);
+            return TCL_ERROR;
+        }
     }
 
     instanceData = ckalloc(sizeof(*instanceData));
@@ -209,20 +219,22 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
             &isNew);
     Tcl_SetHashValue(hashPtr, (ClientData) instanceData);
 
-    duk_push_global_object(ctx);       /* [global] */
-    duk_push_string(ctx, "Duktape");   /* [global] ["duktape"] */
-    duk_get_prop(ctx, -2);             /* [global] [duktape] */
-    if (duk_is_object(ctx, -1)) {
-        duk_push_string(ctx, "tcl");   /* [global] [duktape] ["tcl"] */
-        duk_push_object(ctx);          /* [global] [duktape] ["tcl"] [object] */
-        duk_push_string(ctx, "eval");  /* [global] [duktape] ["tcl"] [object] ["eval"] */
-        duk_push_c_function(ctx, EvalTclFromJS, DUK_VARARGS);
-                                       /* [global] [duktape] ["tcl"] [object] ["eval"] [function] */
-        duk_put_prop(ctx, -3);         /* [global] [duktape] ["tcl"] [object.eval=function] */
-        duk_put_prop(ctx, -3);         /* [global] [duktape.tcl=object] */
+    if (includeTcl) {
+        duk_push_global_object(ctx);       /* [global] */
+        duk_push_string(ctx, "Duktape");   /* [global] ["duktape"] */
+        duk_get_prop(ctx, -2);             /* [global] [duktape] */
+        if (duk_is_object(ctx, -1)) {
+            duk_push_string(ctx, "tcl");   /* [global] [duktape] ["tcl"] */
+            duk_push_object(ctx);          /* [global] [duktape] ["tcl"] [object] */
+            duk_push_string(ctx, "eval");  /* [global] [duktape] ["tcl"] [object] ["eval"] */
+            duk_push_c_function(ctx, EvalTclFromJS, DUK_VARARGS);
+                                           /* [global] [duktape] ["tcl"] [object] ["eval"] [function] */
+            duk_put_prop(ctx, -3);         /* [global] [duktape] ["tcl"] [object.eval=function] */
+            duk_put_prop(ctx, -3);         /* [global] [duktape.tcl=object] */
+        }
+        duk_pop(ctx);                      /* [global] */
+        duk_pop(ctx);                      /* */
     }
-    duk_pop(ctx);                      /* [global] */
-    duk_pop(ctx);                      /* */
 
     Tcl_SetObjResult(interp, token);
     return TCL_OK;
