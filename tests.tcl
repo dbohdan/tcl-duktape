@@ -148,6 +148,40 @@ namespace eval ::duktape::tests {
         return $result
     } -result 15
 
+    tcltest::test test7 {Tcl Functions} -setup $setup -body {
+        set dt [::duktape::init -unsafe false]
+        ::duktape::tclfunction $dt test {args} {
+            return [join $args {}]
+        }
+        set result [::duktape::eval $dt {
+            test('P', 'A', 'S', 'S');
+        }]
+        ::duktape::close $dt
+        return $result
+    } -result PASS
+
+    tcltest::test test8 {Tcl Eval} -setup $setup -body {
+        set dt [::duktape::init]
+        ::duktape::makeunsafe $dt
+        set result [::duktape::eval $dt {
+            Duktape.tcl.eval('join', 'P A S S', '');
+        }]
+        ::duktape::close $dt
+        return $result
+    } -result PASS
+
+    tcltest::test test9 {Tcl Safe} -setup $setup -body {
+        set dt [::duktape::init -unsafe false]
+        catch {
+            set result [::duktape::eval $dt {
+                Duktape.tcl.eval('expr', '1+1');
+            }]
+        } result
+        ::duktape::close $dt
+        return $result
+        # XXX:TODO: More stable error ?
+    } -result {TypeError: cannot read property 'eval' of undefined}
+
     tcltest::cleanupTests
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {
