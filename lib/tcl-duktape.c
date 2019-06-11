@@ -58,9 +58,9 @@ struct DuktapeData
 };
 
 struct DuktapeInstanceData {
-	Tcl_Interp *interp;
-	duk_context *ctx;
-	int isUnsafe;
+    Tcl_Interp *interp;
+    duk_context *ctx;
+    int isUnsafe;
 };
 
 #define DUKTCL_CDATA ((struct DuktapeData *) cdata)
@@ -120,153 +120,153 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
  * Evaluate a Tcl string and return the result to JavaScript
  */
 static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx) {
-	Tcl_Obj *evalScript, *evalResult, *dukStringObj;
-	duk_size_t dukStringLength;
-	duk_idx_t numArgs;
-	const char *dukString;
-	char *evalResultString;
-	int evalResultStringLength;
-	int tclRet;
-	int idx;
+    Tcl_Obj *evalScript, *evalResult, *dukStringObj;
+    duk_size_t dukStringLength;
+    duk_idx_t numArgs;
+    const char *dukString;
+    char *evalResultString;
+    int evalResultStringLength;
+    int tclRet;
+    int idx;
 
-	numArgs = duk_get_top(ctx);
-	if (numArgs < 0) {
-		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INTERNAL_ARGS_ERROR);
-		return(duk_throw(ctx));
-	}
+    numArgs = duk_get_top(ctx);
+    if (numArgs < 0) {
+        duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INTERNAL_ARGS_ERROR);
+        return(duk_throw(ctx));
+    }
 
-	evalScript = Tcl_NewListObj(0, NULL);
-	for (idx = 0; idx < numArgs; idx++) {
-		/*
-		 * XXX:TODO: Convert types ?
-		 *     object          => dict ?  or JSON ?
-		 *     array           => list ?  or JSON ?
-		 *     null/undefined  => empty string ?
-		 *     everything else => string
-		 */
-		dukString = NULL;
-		if (duk_check_type_mask(ctx, idx, DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_UNDEFINED)) {
-			dukString = "";
-			dukStringLength = 0;
-		}
+    evalScript = Tcl_NewListObj(0, NULL);
+    for (idx = 0; idx < numArgs; idx++) {
+        /*
+         * XXX:TODO: Convert types ?
+         *     object          => dict ?  or JSON ?
+         *     array           => list ?  or JSON ?
+         *     null/undefined  => empty string ?
+         *     everything else => string
+         */
+        dukString = NULL;
+        if (duk_check_type_mask(ctx, idx, DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_UNDEFINED)) {
+            dukString = "";
+            dukStringLength = 0;
+        }
 
-		if (duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
-			duk_json_encode(ctx, idx);
-		}
+        if (duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
+            duk_json_encode(ctx, idx);
+        }
 
-		if (!dukString) {
-			dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
-		}
+        if (!dukString) {
+            dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
+        }
 
-		if (!dukString) {
-			duk_push_error_object(ctx, DUK_ERR_TYPE_ERROR, "%s", ERROR_INVALID_STRING);
-			return(duk_throw(ctx));
-		}
+        if (!dukString) {
+            duk_push_error_object(ctx, DUK_ERR_TYPE_ERROR, "%s", ERROR_INVALID_STRING);
+            return(duk_throw(ctx));
+        }
 
-		/* XXX:TODO: Encoding */
-		dukStringObj = Tcl_NewStringObj(dukString, dukStringLength);
+        /* XXX:TODO: Encoding */
+        dukStringObj = Tcl_NewStringObj(dukString, dukStringLength);
 
-		tclRet = Tcl_ListObjAppendElement(interp, evalScript, dukStringObj);
-		if (tclRet != TCL_OK) {
-			duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INTERNAL_TCL_LAPPEND);
-			return(duk_throw(ctx));
-		}
-	}
-	for (idx = 0; idx < numArgs; idx++) {
-		duk_pop(ctx);
-	}
+        tclRet = Tcl_ListObjAppendElement(interp, evalScript, dukStringObj);
+        if (tclRet != TCL_OK) {
+            duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INTERNAL_TCL_LAPPEND);
+            return(duk_throw(ctx));
+        }
+    }
+    for (idx = 0; idx < numArgs; idx++) {
+        duk_pop(ctx);
+    }
 
-	tclRet = Tcl_EvalObjEx(interp, evalScript, 0);
-	if (tclRet != TCL_OK) {
-		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", Tcl_GetStringResult(interp));
-		return(duk_throw(ctx));
-	}
+    tclRet = Tcl_EvalObjEx(interp, evalScript, 0);
+    if (tclRet != TCL_OK) {
+        duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", Tcl_GetStringResult(interp));
+        return(duk_throw(ctx));
+    }
 
-	evalResult = Tcl_GetObjResult(interp);
+    evalResult = Tcl_GetObjResult(interp);
 
-	evalResultString = Tcl_GetStringFromObj(evalResult, &evalResultStringLength);
-	duk_push_lstring(ctx, evalResultString, evalResultStringLength);
+    evalResultString = Tcl_GetStringFromObj(evalResult, &evalResultStringLength);
+    duk_push_lstring(ctx, evalResultString, evalResultStringLength);
 
-	Tcl_FreeResult(interp);
+    Tcl_FreeResult(interp);
 
-	return(1);
+    return(1);
 }
 
 static duk_ret_t EvalTclFromJS(duk_context *ctx) {
-	struct DuktapeInstanceData *instanceData;
-	duk_memory_functions funcs;
-	Tcl_Interp *interp;
+    struct DuktapeInstanceData *instanceData;
+    duk_memory_functions funcs;
+    Tcl_Interp *interp;
 
-	duk_get_memory_functions(ctx, &funcs);
-	instanceData = funcs.udata;
+    duk_get_memory_functions(ctx, &funcs);
+    instanceData = funcs.udata;
 
-	if (!instanceData) {
-		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INSTANCE);
-		return(duk_throw(ctx));
-	}
+    if (!instanceData) {
+        duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INSTANCE);
+        return(duk_throw(ctx));
+    }
 
-	if (!instanceData->isUnsafe) {
-		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_NOT_ALLOWED);
-		return(duk_throw(ctx));
-	}
+    if (!instanceData->isUnsafe) {
+        duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_NOT_ALLOWED);
+        return(duk_throw(ctx));
+    }
 
-	interp = instanceData->interp;
+    interp = instanceData->interp;
 
-	if (!interp) {
-		duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INTERP);
-		return(duk_throw(ctx));
-	}
+    if (!interp) {
+        duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INVALID_INTERP);
+        return(duk_throw(ctx));
+    }
 
-	return(EvalTclFromJSWithInterp(interp, ctx));
+    return(EvalTclFromJSWithInterp(interp, ctx));
 }
 
 static void MakeContextUnsafe(duk_context *ctx) {
-	struct DuktapeInstanceData *instanceData;
-	duk_memory_functions funcs;
+    struct DuktapeInstanceData *instanceData;
+    duk_memory_functions funcs;
 
-	duk_get_memory_functions(ctx, &funcs);
-	instanceData = funcs.udata;
+    duk_get_memory_functions(ctx, &funcs);
+    instanceData = funcs.udata;
 
-	instanceData->isUnsafe = 1;
+    instanceData->isUnsafe = 1;
 
-	duk_push_global_object(ctx);           /* => [global] */
-	duk_push_string(ctx, "Duktape");       /* => [global] ["duktape"] */
-	duk_get_prop(ctx, -2);                 /* => [global] [duktape] */
-	if (duk_is_object(ctx, -1)) {
-		duk_push_string(ctx, "tcl");   /* => [global] [duktape] ["tcl"] */
-		duk_push_object(ctx);          /* => [global] [duktape] ["tcl"] [object] */
-		duk_push_string(ctx, "eval");  /* => [global] [duktape] ["tcl"] [object] ["eval"] */
-		duk_push_c_function(ctx, EvalTclFromJS, DUK_VARARGS);
-		                               /* => [global] [duktape] ["tcl"] [object] ["eval"] [function] */
-		duk_put_prop(ctx, -3);         /* => [global] [duktape] ["tcl"] [object.eval=function] */
-		duk_put_prop(ctx, -3);         /* => [global] [duktape.tcl=object] */
-	}
-	duk_pop(ctx);                          /* => [global] */
-	duk_pop(ctx);                          /* => */
+    duk_push_global_object(ctx);           /* => [global] */
+    duk_push_string(ctx, "Duktape");       /* => [global] ["duktape"] */
+    duk_get_prop(ctx, -2);                 /* => [global] [duktape] */
+    if (duk_is_object(ctx, -1)) {
+        duk_push_string(ctx, "tcl");   /* => [global] [duktape] ["tcl"] */
+        duk_push_object(ctx);          /* => [global] [duktape] ["tcl"] [object] */
+        duk_push_string(ctx, "eval");  /* => [global] [duktape] ["tcl"] [object] ["eval"] */
+        duk_push_c_function(ctx, EvalTclFromJS, DUK_VARARGS);
+                                       /* => [global] [duktape] ["tcl"] [object] ["eval"] [function] */
+        duk_put_prop(ctx, -3);         /* => [global] [duktape] ["tcl"] [object.eval=function] */
+        duk_put_prop(ctx, -3);         /* => [global] [duktape.tcl=object] */
+    }
+    duk_pop(ctx);                          /* => [global] */
+    duk_pop(ctx);                          /* => */
 
-	return;
+    return;
 }
 
 static void MakeContextSafe(duk_context *ctx) {
-	struct DuktapeInstanceData *instanceData;
-	duk_memory_functions funcs;
+    struct DuktapeInstanceData *instanceData;
+    duk_memory_functions funcs;
 
-	duk_get_memory_functions(ctx, &funcs);
-	instanceData = funcs.udata;
+    duk_get_memory_functions(ctx, &funcs);
+    instanceData = funcs.udata;
 
-	instanceData->isUnsafe = 0;
+    instanceData->isUnsafe = 0;
 
-	duk_push_global_object(ctx);           /* => [global] */
-	duk_push_string(ctx, "Duktape");       /* => [global] ["duktape"] */
-	duk_get_prop(ctx, -2);                 /* => [global] [duktape] */
-	if (duk_is_object(ctx, -1)) {
-		duk_push_string(ctx, "tcl");   /* => [global] [duktape] ["tcl"] */
-		duk_del_prop(ctx, -2);         /* => [global] [duktape]  */
-	}
-	duk_pop(ctx);                          /* => [global] */
-	duk_pop(ctx);                          /* => */
+    duk_push_global_object(ctx);           /* => [global] */
+    duk_push_string(ctx, "Duktape");       /* => [global] ["duktape"] */
+    duk_get_prop(ctx, -2);                 /* => [global] [duktape] */
+    if (duk_is_object(ctx, -1)) {
+        duk_push_string(ctx, "tcl");   /* => [global] [duktape] ["tcl"] */
+        duk_del_prop(ctx, -2);         /* => [global] [duktape]  */
+    }
+    duk_pop(ctx);                          /* => [global] */
+    duk_pop(ctx);                          /* => */
 
-	return;
+    return;
 }
 
 /*
@@ -328,39 +328,39 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 }
 
 static int MakeSafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
-	duk_context *ctx;
+    duk_context *ctx;
 
-	if (objc != 2) {
-		Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKE_SAFE);
-		return(TCL_ERROR);
-	}
+    if (objc != 2) {
+        Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKE_SAFE);
+        return(TCL_ERROR);
+    }
 
-	ctx = parse_id(cdata, interp, objv[1], 0);
-	if (!ctx) {
-		return(TCL_ERROR);
-	}
+    ctx = parse_id(cdata, interp, objv[1], 0);
+    if (!ctx) {
+        return(TCL_ERROR);
+    }
 
-	MakeContextSafe(ctx);
+    MakeContextSafe(ctx);
 
-	return(TCL_OK);
+    return(TCL_OK);
 }
 
 static int MakeUnsafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
-	duk_context *ctx;
+    duk_context *ctx;
 
-	if (objc != 2) {
-		Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKE_UNSAFE);
-		return(TCL_ERROR);
-	}
+    if (objc != 2) {
+        Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKE_UNSAFE);
+        return(TCL_ERROR);
+    }
 
-	ctx = parse_id(cdata, interp, objv[1], 0);
-	if (!ctx) {
-		return(TCL_ERROR);
-	}
+    ctx = parse_id(cdata, interp, objv[1], 0);
+    if (!ctx) {
+        return(TCL_ERROR);
+    }
 
-	MakeContextUnsafe(ctx);
+    MakeContextUnsafe(ctx);
 
-	return(TCL_OK);
+    return(TCL_OK);
 }
 
 /*
@@ -395,55 +395,55 @@ Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
  * Evaluate a Tcl string and return the result to JavaScript
  */
 static duk_ret_t EvalTclCmdFromJS(duk_context *ctx) {
-	struct DuktapeInstanceData *instanceData;
-	duk_memory_functions funcs;
-	Tcl_Interp *interp;
+    struct DuktapeInstanceData *instanceData;
+    duk_memory_functions funcs;
+    Tcl_Interp *interp;
 
-	duk_get_memory_functions(ctx, &funcs);
-	instanceData = funcs.udata;
+    duk_get_memory_functions(ctx, &funcs);
+    instanceData = funcs.udata;
 
-	interp = instanceData->interp;
+    interp = instanceData->interp;
 
-	duk_push_current_function(ctx);          /* => [args...] [function] */
-	duk_push_literal(ctx, "apply");          /* => [args...] [function] ["apply"] */
-	duk_get_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda"));  /* => [args...] [function] ["apply"] [lambda] */
-	duk_insert(ctx, 0);                      /* => [lambda] [args...] [function] ["apply"] */
-	duk_insert(ctx, 0);                      /* => ["apply"] [lambda] [args...] [function] */
-	duk_pop(ctx);                            /* => ["apply"] [lambda] [args...] */
+    duk_push_current_function(ctx);          /* => [args...] [function] */
+    duk_push_literal(ctx, "apply");          /* => [args...] [function] ["apply"] */
+    duk_get_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda"));  /* => [args...] [function] ["apply"] [lambda] */
+    duk_insert(ctx, 0);                      /* => [lambda] [args...] [function] ["apply"] */
+    duk_insert(ctx, 0);                      /* => ["apply"] [lambda] [args...] [function] */
+    duk_pop(ctx);                            /* => ["apply"] [lambda] [args...] */
 
-	return(EvalTclFromJSWithInterp(interp, ctx));
+    return(EvalTclFromJSWithInterp(interp, ctx));
 }
 
 static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
-	duk_context *ctx;
-	Tcl_Obj *lambdaObj;
-	const char *functionName, *lambdaString;
-	int lambdaStringLength;
+    duk_context *ctx;
+    Tcl_Obj *lambdaObj;
+    const char *functionName, *lambdaString;
+    int lambdaStringLength;
 
-	if (objc != 5) {
-		Tcl_WrongNumArgs(interp, 1, objv, USAGE_TCL_FUNCTION);
-		return(TCL_ERROR);
-	}
+    if (objc != 5) {
+        Tcl_WrongNumArgs(interp, 1, objv, USAGE_TCL_FUNCTION);
+        return(TCL_ERROR);
+    }
 
-	ctx = parse_id(cdata, interp, objv[1], 0);
-	if (ctx == NULL) {
-		return(TCL_ERROR);
-	}
+    ctx = parse_id(cdata, interp, objv[1], 0);
+    if (ctx == NULL) {
+        return(TCL_ERROR);
+    }
 
-	functionName = Tcl_GetStringFromObj(objv[2], NULL);
+    functionName = Tcl_GetStringFromObj(objv[2], NULL);
 
         lambdaObj = Tcl_NewListObj(2, objv + 3);
-	lambdaString = Tcl_GetStringFromObj(lambdaObj, &lambdaStringLength);
-	Tcl_DecrRefCount(lambdaObj);
+    lambdaString = Tcl_GetStringFromObj(lambdaObj, &lambdaStringLength);
+    Tcl_DecrRefCount(lambdaObj);
 
-	duk_push_global_object(ctx);                               /* => [global] */
-	duk_push_c_function(ctx, EvalTclCmdFromJS, DUK_VARARGS);   /* => [global] [function] */
-	duk_push_lstring(ctx, lambdaString, lambdaStringLength);   /* => [global] [function] [lambda] */
-	duk_put_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda")); /* => [global] [function] */
-	duk_put_prop_string(ctx, -2, functionName);                /* => [global] */
-	duk_pop(ctx);                                              /* => */
+    duk_push_global_object(ctx);                               /* => [global] */
+    duk_push_c_function(ctx, EvalTclCmdFromJS, DUK_VARARGS);   /* => [global] [function] */
+    duk_push_lstring(ctx, lambdaString, lambdaStringLength);   /* => [global] [function] [lambda] */
+    duk_put_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda")); /* => [global] [function] */
+    duk_put_prop_string(ctx, -2, functionName);                /* => [global] */
+    duk_pop(ctx);                                              /* => */
 
-	return(TCL_OK);
+    return(TCL_OK);
 }
 
 
