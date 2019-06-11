@@ -150,6 +150,10 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx) {
             dukStringLength = 0;
         }
 
+        if (duk_is_buffer_data(ctx, idx)) {
+            duk_buffer_to_string(ctx, idx);
+        }
+
         if (duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
             duk_json_encode(ctx, idx);
         }
