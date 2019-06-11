@@ -25,7 +25,7 @@ sudo make install
 
 ### Procedures
 
-* `::duktape::init` -> token
+* `::duktape::init ?-unsafe <boolean>?` -> token
 * `::duktape::close token` -> (nothing)
 * `::duktape::eval token code` -> (evaluation result)
 * `::duktape::call-method token method this ?{arg ?type?}?` -> (evaluation result)
@@ -33,6 +33,13 @@ sudo make install
 * `::duktape::call token function ?{arg ?type?}?` -> (evaluation result)
 * `::duktape::call-(str|num) token function ?arg?` -> (evaluation result)
 * `::duktape::jsproc token name arguments body` -> (nothing)
+* `::duktape::tclfunction token name arguments body` -> (nothing)
+* `::duktape::makesafe token` -> (nothing)`
+* `::duktape::makeunsafe token` -> (nothing)`
+
+`makesafe` and `makeunsafe` control whether a new JavaScript function named
+`Duktape.tcl.eval()` is created which allows for evaluation of arbitrary Tcl
+scripts.
 
 ### TclOO wrapper
 
