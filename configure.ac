@@ -1,5 +1,5 @@
 dnl Define ourselves
-AC_INIT(tcl-duktape, 0.6.1)
+AC_INIT(tcl-duktape, 0.7.0)
 
 dnl Checks for programs.
 AC_PROG_CC
