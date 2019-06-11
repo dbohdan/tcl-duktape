@@ -149,7 +149,7 @@ namespace eval ::duktape::tests {
     } -result 15
 
     tcltest::test test7 {Tcl Functions} -setup $setup -body {
-        set dt [::duktape::init -unsafe false]
+        set dt [::duktape::init -safe true]
         ::duktape::tcl-function $dt test {args} {
             return [join $args {}]
         }
@@ -171,7 +171,7 @@ namespace eval ::duktape::tests {
     } -result PASS
 
     tcltest::test test9 {Tcl Safe} -setup $setup -body {
-        set dt [::duktape::init -unsafe false]
+        set dt [::duktape::init -safe true]
         catch {
             set result [::duktape::eval $dt {
                 Duktape.tcl.eval('expr', '1+1');

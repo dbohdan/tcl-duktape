@@ -25,7 +25,7 @@ sudo make install
 
 ### Procedures
 
-* `::duktape::init ?-unsafe <boolean>?` -> token
+* `::duktape::init ?-safe <boolean>?` -> token
 * `::duktape::close token` -> (nothing)
 * `::duktape::eval token code` -> (evaluation result)
 * `::duktape::call-method token method this ?{arg ?type?}?` -> (evaluation result)

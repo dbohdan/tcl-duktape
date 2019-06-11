@@ -41,7 +41,7 @@
 
 /* Usage. */
 
-#define USAGE_INIT "?-unsafe <boolean>?"
+#define USAGE_INIT "?-safe <boolean>?"
 #define USAGE_MAKE_SAFE "token"
 #define USAGE_MAKE_UNSAFE "token"
 #define USAGE_CLOSE "token"
@@ -282,7 +282,7 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     Tcl_HashEntry *hashPtr;
     int isNew;
     Tcl_Obj *token;
-    int makeUnsafe = 0;
+    int makeSafe = 1;
     int tclRet;
 
     if (objc != 1 && objc != 3) {
@@ -291,11 +291,11 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     }
 
     if (objc == 3) {
-        if (strcmp(Tcl_GetStringFromObj(objv[1], NULL), "-unsafe") != 0) {
+        if (strcmp(Tcl_GetStringFromObj(objv[1], NULL), "-safe") != 0) {
             Tcl_WrongNumArgs(interp, 1, objv, USAGE_INIT);
             return TCL_ERROR;
         }
-        tclRet = Tcl_GetBoolean(interp, Tcl_GetStringFromObj(objv[2], NULL), &makeUnsafe);
+        tclRet = Tcl_GetBoolean(interp, Tcl_GetStringFromObj(objv[2], NULL), &makeSafe);
         if (tclRet != TCL_OK) {
             return(tclRet);
         }
@@ -319,7 +319,7 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
             &isNew);
     Tcl_SetHashValue(hashPtr, (ClientData) instanceData);
 
-    if (makeUnsafe) {
+    if (!makeSafe) {
         MakeContextUnsafe(ctx);
     }
 
