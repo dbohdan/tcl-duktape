@@ -150,7 +150,7 @@ namespace eval ::duktape::tests {
 
     tcltest::test test7 {Tcl Functions} -setup $setup -body {
         set dt [::duktape::init -unsafe false]
-        ::duktape::tclfunction $dt test {args} {
+        ::duktape::tcl-function $dt test {args} {
             return [join $args {}]
         }
         set result [::duktape::eval $dt {
@@ -162,7 +162,7 @@ namespace eval ::duktape::tests {
 
     tcltest::test test8 {Tcl Eval} -setup $setup -body {
         set dt [::duktape::init]
-        ::duktape::makeunsafe $dt
+        ::duktape::make-unsafe $dt
         set result [::duktape::eval $dt {
             Duktape.tcl.eval('join', 'P A S S', '');
         }]

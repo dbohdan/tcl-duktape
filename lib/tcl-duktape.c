@@ -20,11 +20,11 @@
 /* Command names. */
 
 #define INIT "::init"
-#define MAKESAFE "::makesafe"
-#define MAKEUNSAFE "::makeunsafe"
+#define MAKE_SAFE "::make-safe"
+#define MAKE_UNSAFE "::make-unsafe"
 #define CLOSE "::close"
 #define EVAL "::eval"
-#define TCLFUNCTION "::tclfunction"
+#define TCL_FUNCTION "::tcl-function"
 #define CALL_METHOD "::call-method"
 
 /* Error messages. */
@@ -42,11 +42,11 @@
 /* Usage. */
 
 #define USAGE_INIT "?-unsafe <boolean>?"
-#define USAGE_MAKESAFE "token"
-#define USAGE_MAKEUNSAFE "token"
+#define USAGE_MAKE_SAFE "token"
+#define USAGE_MAKE_UNSAFE "token"
 #define USAGE_CLOSE "token"
 #define USAGE_EVAL "token code"
-#define USAGE_TCLFUNCTION "token name args body"
+#define USAGE_TCL_FUNCTION "token name args body"
 #define USAGE_CALL_METHOD "token method this ?{arg ?type?}? ..."
 
 /* Data types. */
@@ -331,7 +331,7 @@ static int MakeSafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj 
 	duk_context *ctx;
 
 	if (objc != 2) {
-		Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKESAFE);
+		Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKE_SAFE);
 		return(TCL_ERROR);
 	}
 
@@ -349,7 +349,7 @@ static int MakeUnsafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Ob
 	duk_context *ctx;
 
 	if (objc != 2) {
-		Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKEUNSAFE);
+		Tcl_WrongNumArgs(interp, 1, objv, USAGE_MAKE_UNSAFE);
 		return(TCL_ERROR);
 	}
 
@@ -421,7 +421,7 @@ static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, 
 	int lambdaStringLength;
 
 	if (objc != 5) {
-		Tcl_WrongNumArgs(interp, 1, objv, USAGE_TCLFUNCTION);
+		Tcl_WrongNumArgs(interp, 1, objv, USAGE_TCL_FUNCTION);
 		return(TCL_ERROR);
 	}
 
@@ -644,11 +644,11 @@ Tclduktape_Init(Tcl_Interp *interp)
     Tcl_InitHashTable(&duktape_data->table, TCL_STRING_KEYS);
 
     Tcl_CreateObjCommand(interp, NS INIT, Init_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS MAKESAFE, MakeSafe_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS MAKEUNSAFE, MakeUnsafe_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS MAKE_SAFE, MakeSafe_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS MAKE_UNSAFE, MakeUnsafe_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS TCLFUNCTION, RegisterFunction_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS TCL_FUNCTION, RegisterFunction_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CALL_METHOD,
             CallMethod_Cmd, duktape_data, NULL);
     Tcl_CallWhenDeleted(interp, cleanup_interp, duktape_data);
