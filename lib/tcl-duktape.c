@@ -123,51 +123,71 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
 static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
     const char *dukString;
     duk_size_t dukStringLength;
-    Tcl_Obj *dukStringObj;
+    duk_int_t arrayLength;
+    duk_idx_t arrayIndex;
+    Tcl_Obj *dukStringObj, *dukItemObj;
     enum {
         TCLDUK_TYPE_BYTEARRAY,
         TCLDUK_TYPE_STRING
     } string_format;
 
     /*
-     * XXX:TODO: Convert types ?
-     *     object          => dict ?  or JSON ?
-     *     array           => list ?  or JSON ?
-     *     null/undefined  => empty string ?
+     * Convert types
+     *     buffer          => ByteArray
+     *     array           => List
+     *     null/undefined  => empty string
+     *     other object    => JSON
      *     everything else => string
      */
     dukString = NULL;
+    dukStringObj = NULL;
     string_format = TCLDUK_TYPE_STRING;
     if (duk_check_type_mask(ctx, idx, DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_UNDEFINED)) {
         dukString = "";
         dukStringLength = 0;
     }
 
-    if (duk_is_buffer_data(ctx, idx)) {
+    if (!dukString && !dukStringObj && duk_is_array(ctx, idx)) {
+        duk_get_prop_string(ctx, idx, "length");
+        arrayLength = duk_get_int(ctx, -1);
+        duk_pop(ctx);
+
+        dukStringObj = Tcl_NewObj();
+        for (arrayIndex = 0; arrayIndex < arrayLength; arrayIndex++) {
+            duk_get_prop_index(ctx, idx, arrayIndex);
+            dukItemObj = Tclduk_JSToTcl(ctx, -1);
+            duk_pop(ctx);
+
+            Tcl_ListObjAppendElement(NULL, dukStringObj, dukItemObj);
+        }
+    }
+
+    if (!dukString && !dukStringObj && duk_is_buffer_data(ctx, idx)) {
         duk_buffer_to_string(ctx, idx);
         string_format = TCLDUK_TYPE_BYTEARRAY;
     }
 
-    if (duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
+    if (!dukString && !dukStringObj && duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
         duk_json_encode(ctx, idx);
     }
 
-    if (!dukString) {
-        dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
-    }
+    if (!dukStringObj) {
+        if (!dukString) {
+            dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
+        }
 
-    if (!dukString) {
-        return(NULL);
-    }
+        if (!dukString) {
+            return(NULL);
+        }
 
-    switch (string_format) {
-        case TCLDUK_TYPE_BYTEARRAY:
-            dukStringObj = Tcl_NewByteArrayObj((const unsigned char *) dukString, dukStringLength);
-            break;
-        case TCLDUK_TYPE_STRING:
-            /* XXX:TODO: Encoding */
-            dukStringObj = Tcl_NewStringObj(dukString, dukStringLength);
-            break;
+        switch (string_format) {
+            case TCLDUK_TYPE_BYTEARRAY:
+                dukStringObj = Tcl_NewByteArrayObj((const unsigned char *) dukString, dukStringLength);
+                break;
+            case TCLDUK_TYPE_STRING:
+                dukStringObj = Tcl_NewStringObj(dukString, dukStringLength);
+                break;
+        }
     }
 
     return(dukStringObj);
@@ -277,9 +297,6 @@ static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context 
         case TCLDUK_TYPE_STRING:
         case TCLDUK_TYPE_JSON:
             valueString = Tcl_GetStringFromObj(value, &valueStringLength);
-            if (string_format == TCLDUK_TYPE_STRING) {
-                /* XXX:TODO: Encoding */
-            }
             duk_push_lstring(ctx, valueString, valueStringLength);
 
             /* If JSON is being pushed, convert to an object */

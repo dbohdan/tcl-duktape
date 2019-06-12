@@ -212,6 +212,18 @@ namespace eval ::duktape::tests {
         return $result
     } -result verified
 
+    tcltest::test test11 {From array} -setup $setup -body {
+        set dt [::duktape::init]
+        ::duktape::tcl-function $dt test {input} {
+            return [lindex $input 1 1]
+        }
+        set result [::duktape::eval $dt {
+            test([["1a","1b","1c"],["2a","PASS","2c"]])
+        }]
+        ::duktape::close $dt
+        return $result
+    } -result PASS
+
     tcltest::cleanupTests
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {
