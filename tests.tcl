@@ -183,6 +183,35 @@ namespace eval ::duktape::tests {
         # XXX:TODO: More stable error ?
     } -result {TypeError: cannot read property 'eval' of undefined}
 
+    tcltest::test test10 {To JSON} -setup $setup -body {
+        set dt [::duktape::init]
+        ::duktape::tcl-function $dt test json {result} {
+            return "\{\"test\":\"$result\"\}"
+        }
+        set result [::duktape::eval $dt {
+            check = test("verified");
+            check.test
+        }]
+        ::duktape::close $dt
+        return $result
+    } -result verified
+
+    tcltest::test test10 {To array} -setup $setup -body {
+        set dt [::duktape::init]
+        ::duktape::tcl-function $dt test {arraylist json} {result} {
+            set retval [list]
+            lappend retval "\{\"test\":\"failed\"\}"
+            lappend retval "\{\"test\":\"$result\"\}"
+            return $retval
+        }
+        set result [::duktape::eval $dt {
+            check = test("verified");
+            check[1].test
+        }]
+        ::duktape::close $dt
+        return $result
+    } -result verified
+
     tcltest::cleanupTests
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {

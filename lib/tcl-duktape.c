@@ -35,6 +35,7 @@
 #define ERROR_INVALID_INSTANCE "unable to locate instance"
 #define ERROR_INVALID_INTERP "unable to locate interp"
 #define ERROR_INVALID_STRING "unable to convert argument to string"
+#define ERROR_INVALID_TYPE "unable to convert argument to invalid type %s"
 #define ERROR_INTERNAL_ARGS_ERROR "internal error: negative arguments?"
 #define ERROR_INTERNAL_TCL_LAPPEND "internal error: lappend failed?"
 #define ERROR_NOT_ALLOWED "action not permitted while safe"
@@ -46,7 +47,7 @@
 #define USAGE_MAKE_UNSAFE "token"
 #define USAGE_CLOSE "token"
 #define USAGE_EVAL "token code"
-#define USAGE_TCL_FUNCTION "token name args body"
+#define USAGE_TCL_FUNCTION "token name ?returnType? args body"
 #define USAGE_CALL_METHOD "token method this ?{arg ?type?}? ..."
 
 /* Data types. */
@@ -117,15 +118,233 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
 }
 
 /*
+ * Convert JavaScript item to a Tcl item
+ */
+static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
+    const char *dukString;
+    duk_size_t dukStringLength;
+    Tcl_Obj *dukStringObj;
+    enum {
+        TCLDUK_TYPE_BYTEARRAY,
+        TCLDUK_TYPE_STRING
+    } string_format;
+
+    /*
+     * XXX:TODO: Convert types ?
+     *     object          => dict ?  or JSON ?
+     *     array           => list ?  or JSON ?
+     *     null/undefined  => empty string ?
+     *     everything else => string
+     */
+    dukString = NULL;
+    string_format = TCLDUK_TYPE_STRING;
+    if (duk_check_type_mask(ctx, idx, DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_UNDEFINED)) {
+        dukString = "";
+        dukStringLength = 0;
+    }
+
+    if (duk_is_buffer_data(ctx, idx)) {
+        duk_buffer_to_string(ctx, idx);
+        string_format = TCLDUK_TYPE_BYTEARRAY;
+    }
+
+    if (duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
+        duk_json_encode(ctx, idx);
+    }
+
+    if (!dukString) {
+        dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
+    }
+
+    if (!dukString) {
+        return(NULL);
+    }
+
+    switch (string_format) {
+        case TCLDUK_TYPE_BYTEARRAY:
+            dukStringObj = Tcl_NewByteArrayObj((const unsigned char *) dukString, dukStringLength);
+            break;
+        case TCLDUK_TYPE_STRING:
+            /* XXX:TODO: Encoding */
+            dukStringObj = Tcl_NewStringObj(dukString, dukStringLength);
+            break;
+    }
+
+    return(dukStringObj);
+}
+
+/*
+ * Convert Tcl item to a JavaScript item
+ */
+static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context *ctx, const char *type) {
+    Tcl_Obj *typeObj, *firstTypeObj, *itemObj;
+    char *firstTypeString, *otherTypesString;
+    const char *valueString;
+    unsigned int type_hash;
+    enum {
+        TCLDUK_TYPE_BOOLEAN,
+        TCLDUK_TYPE_BYTEARRAY,
+        TCLDUK_TYPE_STRING,
+        TCLDUK_TYPE_UNDEFINED,
+        TCLDUK_TYPE_NULL,
+        TCLDUK_TYPE_DOUBLE,
+        TCLDUK_TYPE_INTEGER,
+        TCLDUK_TYPE_BIGINT,
+        TCLDUK_TYPE_ARRAYLIST,
+        TCLDUK_TYPE_JSON
+    } string_format;
+    double valueDouble;
+    duk_idx_t checkRet;
+    int valueBoolean;
+    int valueStringLength, firstTypeStringLength;
+    int idx, numItems;
+    int tclRet;
+
+    /*
+     * If the return type is ignored, return without bothering
+     * fetch the result
+     */
+    if (!type) {
+        type = "string";
+    }
+
+    typeObj = Tcl_NewStringObj(type, -1);
+    tclRet = Tcl_ListObjIndex(NULL, typeObj, 0, &firstTypeObj);
+    if (tclRet != TCL_OK || !firstTypeObj) {
+        firstTypeObj = typeObj;
+    }
+    firstTypeString = Tcl_GetStringFromObj(firstTypeObj, &firstTypeStringLength);
+
+    type_hash = Tcl_ZlibCRC32(0, (const unsigned char *) firstTypeString, firstTypeStringLength);
+
+    switch (type_hash) {
+        case 0x0: /* (empty string) */
+        case 0x9ebeb2a9: /* string */
+            string_format = TCLDUK_TYPE_STRING;
+            break;
+        case 0x8a858868: /* boolean */
+            string_format = TCLDUK_TYPE_BOOLEAN;
+            break;
+        case 0xb3444c: /* bytearray */
+            string_format = TCLDUK_TYPE_BYTEARRAY;
+            break;
+        case 0xfedc304f: /* undefined */
+            string_format = TCLDUK_TYPE_UNDEFINED;
+            break;
+        case 0x25cbfc4f: /* null */
+            string_format = TCLDUK_TYPE_NULL;
+            break;
+        case 0xdae7f2ef: /* double */
+            string_format = TCLDUK_TYPE_DOUBLE;
+            break;
+        case 0x5a0fab0b: /* integer */
+            string_format = TCLDUK_TYPE_INTEGER;
+            break;
+        case 0x2d3dd6d7: /* bigint */
+            string_format = TCLDUK_TYPE_BIGINT;
+            break;
+        case 0x6a75afe3: /* arraylist */
+            string_format = TCLDUK_TYPE_ARRAYLIST;
+            break;
+        case 0x6b072545: /* json */
+            string_format = TCLDUK_TYPE_JSON;
+            break;
+        default:
+            duk_push_error_object(ctx, DUK_ERR_ERROR, ERROR_INVALID_TYPE, type);
+            return(-1);
+            break;
+    }
+
+    switch (string_format) {
+        case TCLDUK_TYPE_UNDEFINED:
+            return(0);
+        case TCLDUK_TYPE_BOOLEAN:
+            tclRet = Tcl_GetBooleanFromObj(NULL, value, &valueBoolean);
+            if (tclRet != TCL_OK) {
+                return(0);
+            }
+            duk_push_boolean(ctx, valueBoolean);
+            return(1);
+        case TCLDUK_TYPE_NULL:
+            duk_push_null(ctx);
+            return(1);
+        case TCLDUK_TYPE_BYTEARRAY:
+            valueString = (const char *) Tcl_GetByteArrayFromObj(value, &valueStringLength);
+            duk_push_lstring(ctx, valueString, valueStringLength);
+            duk_to_buffer(ctx, -1, NULL);
+            return(1);
+        case TCLDUK_TYPE_BIGINT:
+        case TCLDUK_TYPE_STRING:
+        case TCLDUK_TYPE_JSON:
+            valueString = Tcl_GetStringFromObj(value, &valueStringLength);
+            if (string_format == TCLDUK_TYPE_STRING) {
+                /* XXX:TODO: Encoding */
+            }
+            duk_push_lstring(ctx, valueString, valueStringLength);
+
+            /* If JSON is being pushed, convert to an object */
+            if (string_format == TCLDUK_TYPE_JSON) {
+                duk_json_decode(ctx, -1);
+            }
+
+            return(1);
+        case TCLDUK_TYPE_DOUBLE:
+        case TCLDUK_TYPE_INTEGER:
+            tclRet = Tcl_GetDoubleFromObj(NULL, value, &valueDouble);
+            if (tclRet != TCL_OK) {
+                return(0);
+            }
+            if (valueDouble != valueDouble) {
+                duk_push_nan(ctx);
+            } else {
+                duk_push_number(ctx, valueDouble);
+            }
+            return(1);
+        case TCLDUK_TYPE_ARRAYLIST:
+            /*
+             * Remove the first item from the list of types
+             */
+            tclRet = Tcl_ListObjReplace(NULL, typeObj, 0, 1, 0, NULL);
+            otherTypesString = Tcl_GetStringFromObj(typeObj, NULL);
+
+            /*
+             * For each item in the list, format using this
+             * function
+             */
+            tclRet = Tcl_ListObjLength(NULL, value, &numItems);
+            if (tclRet != TCL_OK) {
+                duk_push_null(ctx);
+                return(1);
+            }
+
+            duk_push_array(ctx);
+            for (idx = 0; idx < numItems; idx++) {
+                tclRet = Tcl_ListObjIndex(NULL, value, idx, &itemObj);
+                if (tclRet != TCL_OK) {
+                    duk_push_null(ctx);
+                } else {
+                    checkRet = Tclduk_TclToJS(interp, itemObj, ctx, otherTypesString);
+                    if (checkRet == 0) {
+                        duk_push_null(ctx);
+                    } else if (checkRet != 1) {
+                        /* XXX:TODO: Handle this ? */
+                    }
+                }
+                duk_put_prop_index(ctx, -2, idx);
+            }
+
+            return(1);
+    }
+
+    return(0);
+}
+
+/*
  * Evaluate a Tcl string and return the result to JavaScript
  */
-static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx) {
+static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx, const char *returnType) {
     Tcl_Obj *evalScript, *evalResult, *dukStringObj;
-    duk_size_t dukStringLength;
-    duk_idx_t numArgs;
-    const char *dukString;
-    char *evalResultString;
-    int evalResultStringLength;
+    duk_idx_t numArgs, numRetVals;
     int tclRet;
     int idx;
 
@@ -137,38 +356,11 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx) {
 
     evalScript = Tcl_NewListObj(0, NULL);
     for (idx = 0; idx < numArgs; idx++) {
-        /*
-         * XXX:TODO: Convert types ?
-         *     object          => dict ?  or JSON ?
-         *     array           => list ?  or JSON ?
-         *     null/undefined  => empty string ?
-         *     everything else => string
-         */
-        dukString = NULL;
-        if (duk_check_type_mask(ctx, idx, DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_UNDEFINED)) {
-            dukString = "";
-            dukStringLength = 0;
-        }
-
-        if (duk_is_buffer_data(ctx, idx)) {
-            duk_buffer_to_string(ctx, idx);
-        }
-
-        if (duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
-            duk_json_encode(ctx, idx);
-        }
-
-        if (!dukString) {
-            dukString = duk_safe_to_lstring(ctx, idx, &dukStringLength);
-        }
-
-        if (!dukString) {
+        dukStringObj = Tclduk_JSToTcl(ctx, idx);
+        if (!dukStringObj) {
             duk_push_error_object(ctx, DUK_ERR_TYPE_ERROR, "%s", ERROR_INVALID_STRING);
             return(duk_throw(ctx));
         }
-
-        /* XXX:TODO: Encoding */
-        dukStringObj = Tcl_NewStringObj(dukString, dukStringLength);
 
         tclRet = Tcl_ListObjAppendElement(interp, evalScript, dukStringObj);
         if (tclRet != TCL_OK) {
@@ -188,12 +380,11 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx) {
 
     evalResult = Tcl_GetObjResult(interp);
 
-    evalResultString = Tcl_GetStringFromObj(evalResult, &evalResultStringLength);
-    duk_push_lstring(ctx, evalResultString, evalResultStringLength);
+    numRetVals = Tclduk_TclToJS(interp, evalResult, ctx, returnType);
 
     Tcl_FreeResult(interp);
 
-    return(1);
+    return(numRetVals);
 }
 
 static duk_ret_t EvalTclFromJS(duk_context *ctx) {
@@ -221,7 +412,7 @@ static duk_ret_t EvalTclFromJS(duk_context *ctx) {
         return(duk_throw(ctx));
     }
 
-    return(EvalTclFromJSWithInterp(interp, ctx));
+    return(EvalTclFromJSWithInterp(interp, ctx, NULL));
 }
 
 static void MakeContextUnsafe(duk_context *ctx) {
@@ -402,6 +593,7 @@ static duk_ret_t EvalTclCmdFromJS(duk_context *ctx) {
     struct DuktapeInstanceData *instanceData;
     duk_memory_functions funcs;
     Tcl_Interp *interp;
+    const char *returnType;
 
     duk_get_memory_functions(ctx, &funcs);
     instanceData = funcs.udata;
@@ -413,18 +605,23 @@ static duk_ret_t EvalTclCmdFromJS(duk_context *ctx) {
     duk_get_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda"));  /* => [args...] [function] ["apply"] [lambda] */
     duk_insert(ctx, 0);                      /* => [lambda] [args...] [function] ["apply"] */
     duk_insert(ctx, 0);                      /* => ["apply"] [lambda] [args...] [function] */
+
+    duk_get_prop_string(ctx, -1, DUK_HIDDEN_SYMBOL("returnType"));  /* => [args...] [function] [returnType] */
+    returnType = duk_get_string(ctx, -1);                           /* => [args...] [function] [returnType] */
+
+    duk_pop(ctx);                            /* => ["apply"] [lambda] [args...] [function] */
     duk_pop(ctx);                            /* => ["apply"] [lambda] [args...] */
 
-    return(EvalTclFromJSWithInterp(interp, ctx));
+    return(EvalTclFromJSWithInterp(interp, ctx, returnType));
 }
 
 static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
     duk_context *ctx;
     Tcl_Obj *lambdaObj;
-    const char *functionName, *lambdaString;
-    int lambdaStringLength;
+    const char *functionName, *returnType, *lambdaString;
+    int lambdaStringLength, returnTypeLength;
 
-    if (objc != 5) {
+    if (objc != 5 && objc != 6) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_TCL_FUNCTION);
         return(TCL_ERROR);
     }
@@ -436,16 +633,26 @@ static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, 
 
     functionName = Tcl_GetStringFromObj(objv[2], NULL);
 
-        lambdaObj = Tcl_NewListObj(2, objv + 3);
+    if (objc == 6) {
+        returnType = Tcl_GetStringFromObj(objv[3], &returnTypeLength);
+        objv++;
+    } else {
+        returnType = "string";
+        returnTypeLength = 6;
+    }
+
+    lambdaObj = Tcl_NewListObj(2, objv + 3);
     lambdaString = Tcl_GetStringFromObj(lambdaObj, &lambdaStringLength);
     Tcl_DecrRefCount(lambdaObj);
 
-    duk_push_global_object(ctx);                               /* => [global] */
-    duk_push_c_function(ctx, EvalTclCmdFromJS, DUK_VARARGS);   /* => [global] [function] */
-    duk_push_lstring(ctx, lambdaString, lambdaStringLength);   /* => [global] [function] [lambda] */
-    duk_put_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda")); /* => [global] [function] */
-    duk_put_prop_string(ctx, -2, functionName);                /* => [global] */
-    duk_pop(ctx);                                              /* => */
+    duk_push_global_object(ctx);                                   /* => [global] */
+    duk_push_c_function(ctx, EvalTclCmdFromJS, DUK_VARARGS);       /* => [global] [function] */
+    duk_push_lstring(ctx, lambdaString, lambdaStringLength);       /* => [global] [function] [lambda] */
+    duk_put_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("lambda"));     /* => [global] [function] */
+    duk_push_lstring(ctx, returnType, returnTypeLength);           /* => [global] [function] [returnType] */
+    duk_put_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("returnType")); /* => [global] [function] */
+    duk_put_prop_string(ctx, -2, functionName);                    /* => [global] */
+    duk_pop(ctx);                                                  /* => */
 
     return(TCL_OK);
 }
