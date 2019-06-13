@@ -31,7 +31,7 @@ foreach type $::duktape::types {
     } $type]
 }
 
-# This is used by ::duktape::jsproc.
+# This is used by ::duktape::js-proc.
 proc ::duktape::slugify {text} {
     string trim [regsub -all {[^[:alnum:]]+} [string tolower $text] _] _
 }
@@ -39,7 +39,7 @@ proc ::duktape::slugify {text} {
 # Create a Tcl proc with JavaScript code. $arguments follows the format of
 # {{arg ?default? ?type} ...}. JavaScript argument names will be the same as
 # the Tcl argument names.
-proc ::duktape::jsproc {id name arguments body} {
+proc ::duktape::js-proc {id name arguments body} {
     set tclArgList {}
     set jsArgList {}
     set jsName [slugify $name]

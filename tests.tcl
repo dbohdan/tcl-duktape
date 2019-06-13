@@ -52,16 +52,16 @@ namespace eval ::duktape::tests {
         5         1       NaN 0    5      NaN       5]
     #   (no type) boolean nan null number undefined string
 
-    tcltest::test test3 {jsproc} \
+    tcltest::test test3 {js-proc} \
             -setup $setup \
             -body {
         set result {}
         set id [::duktape::init]
-        ::duktape::jsproc $id foo {{a 1 num} {b 2 num}} {
+        ::duktape::js-proc $id foo {{a 1 num} {b 2 num}} {
             return Math.sin(a) + b;
         }
         catch {
-            ::duktape::jsproc $id foo {} {
+            ::duktape::js-proc $id foo {} {
                 return -1;
             }
         }
@@ -80,11 +80,11 @@ namespace eval ::duktape::tests {
 
         set result {}
         set duktapeInterp [::duktape::oo::Duktape new]
-        $duktapeInterp jsproc foo {{a 1 num} {b 2 num}} {
+        $duktapeInterp js-proc foo {{a 1 num} {b 2 num}} {
             return Math.sin(a) + b;
         }
         lappend result catch:[catch {
-            $duktapeInterp jsproc foo {} {
+            $duktapeInterp js-proc foo {} {
                 return -1;
             }
         }]
@@ -92,7 +92,7 @@ namespace eval ::duktape::tests {
         lappend result [foo 1 2]
         rename foo {}
 
-        $duktapeInterp jsmethod sin {{deg 0 number}} {
+        $duktapeInterp js-method sin {{deg 0 number}} {
             return Math.sin(deg * Math.PI / 180);
         }
         lappend result [$duktapeInterp sin 90]

@@ -64,17 +64,17 @@ namespace eval ::duktape::oo {}
         } $type]
     }
 
-    method jsproc {name arguments body} {
+    method js-proc {name arguments body} {
         my variable id
-        uplevel 1 ::duktape::jsproc [list $id] [list $name] [list $arguments] \
+        uplevel 1 ::duktape::js-proc [list $id] [list $name] [list $arguments] \
                 [list $body]
     }
 
-    method jsmethod {name arguments body} {
+    method js-method {name arguments body} {
         my variable id
-        namespace eval [self namespace]::jsmethods {}
-        set procName [self namespace]::jsmethods::$name
-        ::duktape::jsproc $id $procName $arguments $body
+        namespace eval [self namespace]::js-methods {}
+        set procName [self namespace]::js-methods::$name
+        ::duktape::js-proc $id $procName $arguments $body
         ::oo::objdefine [self object] forward $name $procName
     }
 }

@@ -32,7 +32,7 @@ sudo make install
 * `::duktape::call-method-(str|num) token method this ?arg?` -> (evaluation result)
 * `::duktape::call token function ?{arg ?type?}?` -> (evaluation result)
 * `::duktape::call-(str|num) token function ?arg?` -> (evaluation result)
-* `::duktape::jsproc token name arguments body` -> (nothing)
+* `::duktape::js-proc token name arguments body` -> (nothing)
 * `::duktape::tcl-function token name ?returnType? arguments body` -> (nothing)
 * `::duktape::make-safe token` -> (nothing)`
 * `::duktape::make-unsafe token` -> (nothing)`
@@ -63,10 +63,10 @@ The optional `returnType` argument to `tcl-function` may be one of:
 * `$objName call-method-(str|num) method this ?arg?` -> (evaluation result)
 * `$objName call function ?{arg ?type?}?` -> (evaluation result)
 * `$objName call-(str|num) function ?arg?` -> (evaluation result)
-* `$objName jsproc name arguments body` -> (nothing)
-* `$objName jsmethod name arguments body` -> (nothing)
+* `$objName js-proc name arguments body` -> (nothing)
+* `$objName js-method name arguments body` -> (nothing)
 
-`jsmethod` defines a new method in JavaScript on the Duktape object instance
+`js-method` defines a new method in JavaScript on the Duktape object instance
 `$objName`.
 
 ### JSON objects
