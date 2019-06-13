@@ -210,7 +210,7 @@ static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context 
         TCLDUK_TYPE_DOUBLE,
         TCLDUK_TYPE_INTEGER,
         TCLDUK_TYPE_BIGINT,
-        TCLDUK_TYPE_ARRAYLIST,
+        TCLDUK_TYPE_ARRAY,
         TCLDUK_TYPE_JSON
     } string_format;
     double valueDouble;
@@ -263,8 +263,8 @@ static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context 
         case 0x2d3dd6d7: /* bigint */
             string_format = TCLDUK_TYPE_BIGINT;
             break;
-        case 0x6a75afe3: /* arraylist */
-            string_format = TCLDUK_TYPE_ARRAYLIST;
+        case 0xa10ceeb7: /* array */
+            string_format = TCLDUK_TYPE_ARRAY;
             break;
         case 0x6b072545: /* json */
             string_format = TCLDUK_TYPE_JSON;
@@ -317,7 +317,7 @@ static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context 
                 duk_push_number(ctx, valueDouble);
             }
             return(1);
-        case TCLDUK_TYPE_ARRAYLIST:
+        case TCLDUK_TYPE_ARRAY:
             /*
              * Remove the first item from the list of types
              */

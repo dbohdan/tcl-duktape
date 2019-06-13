@@ -51,8 +51,8 @@ The optional `returnType` argument to `tcl-function` may be one of:
   * `integer` — same as `double`
   * `bigint` — results in a JavaScript string representation of an integer
   * `json` — expects a JSON string; the result is the string decoded as JSON
-  * `arraylist itemType...` — for each item in the array, encode as `itemType`;
-                              the result is an array
+  * `array itemType` — for each item in the array, encode as `itemType`;
+                       the result is an array
 
 ### TclOO wrapper
 

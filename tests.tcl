@@ -198,7 +198,7 @@ namespace eval ::duktape::tests {
 
     tcltest::test test10 {To array} -setup $setup -body {
         set dt [::duktape::init]
-        ::duktape::tcl-function $dt test {arraylist json} {result} {
+        ::duktape::tcl-function $dt test {array json} {result} {
             set retval [list]
             lappend retval "\{\"test\":\"failed\"\}"
             lappend retval "\{\"test\":\"$result\"\}"
