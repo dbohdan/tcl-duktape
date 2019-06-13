@@ -125,7 +125,7 @@ static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
     duk_size_t dukStringLength;
     duk_int_t arrayLength;
     duk_idx_t arrayIndex;
-    Tcl_Obj *dukStringObj, *dukItemObj;
+    Tcl_Obj *dukStringObj, *dukItemObj, *dukCodeObj, *dukCodeLineObj, *dukCodeByteCodeObj;
     enum {
         TCLDUK_TYPE_BYTEARRAY,
         TCLDUK_TYPE_STRING
@@ -160,6 +160,39 @@ static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
 
             Tcl_ListObjAppendElement(NULL, dukStringObj, dukItemObj);
         }
+    }
+
+    if (!dukString && !dukStringObj && duk_is_function(ctx, idx)) {
+        duk_dup(ctx, idx);
+        duk_dump_function(ctx);
+        duk_buffer_to_string(ctx, -1);
+        dukString = duk_safe_to_lstring(ctx, -1, &dukStringLength);
+        dukCodeByteCodeObj = Tcl_NewByteArrayObj((const unsigned char *) dukString, dukStringLength);
+        duk_pop(ctx);
+
+        dukStringObj = Tcl_NewObj();
+        dukItemObj = Tcl_NewObj();
+        dukCodeObj = Tcl_NewObj();
+        dukCodeLineObj = Tcl_NewObj();
+        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
+        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("code", -1));
+        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, dukCodeByteCodeObj);
+        Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
+        Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
+        dukCodeLineObj = Tcl_NewObj();
+        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
+        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("handle", -1));
+Tcl_Obj *handle; /* XXX:TODO */
+handle = Tcl_NewStringObj("::duktape::1", -1);
+        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, handle);
+        Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
+        Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
+        Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("return [::duktape::evalbytecode $handle $code {*}$args]", -1));
+
+        Tcl_ListObjAppendElement(NULL, dukItemObj, Tcl_NewStringObj("args", -1));
+        Tcl_ListObjAppendElement(NULL, dukItemObj, dukCodeObj);
+        Tcl_ListObjAppendElement(NULL, dukStringObj, Tcl_NewStringObj("apply", -1));
+        Tcl_ListObjAppendElement(NULL, dukStringObj, dukItemObj);
     }
 
     if (!dukString && !dukStringObj && duk_is_buffer_data(ctx, idx)) {
@@ -674,6 +707,49 @@ static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, 
     return(TCL_OK);
 }
 
+static int EvalBytecode_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+    duk_context *ctx;
+    Tcl_Obj *bytecodeObj, *result;
+    const unsigned char *bytecode;
+    int bytecodeLength;
+    int idx;
+    int retval;
+
+    if (objc < 3) {
+        Tcl_WrongNumArgs(interp, 1, objv, "XXX:TODO");
+        return(TCL_ERROR);
+    }
+
+    ctx = parse_id(cdata, interp, objv[1], 0);
+    if (ctx == NULL) {
+        return(TCL_ERROR);
+    }
+
+    bytecodeObj = objv[2];
+    bytecode = Tcl_GetByteArrayFromObj(bytecodeObj, &bytecodeLength);
+
+    duk_push_lstring(ctx, (const char *) bytecode, bytecodeLength);
+    duk_to_buffer(ctx, -1, NULL);
+    duk_load_function(ctx);
+
+    for (idx = 3; idx < objc; idx++) {
+        Tclduk_TclToJS(interp, objv[idx], ctx, NULL);
+    }
+
+    duk_call(ctx, objc - 3);
+
+    retval = TCL_OK;
+    if (duk_is_error(ctx, -1)) {
+        retval = TCL_ERROR;
+    }
+
+    result = Tclduk_JSToTcl(ctx, -1);
+    duk_pop(ctx);
+
+    Tcl_SetObjResult(interp, result);
+
+    return(retval);
+}
 
 /*
  * Evaluate a string as Duktape code in the selected heap.
@@ -876,6 +952,7 @@ Tclduktape_Init(Tcl_Interp *interp)
     Tcl_CreateObjCommand(interp, NS MAKE_UNSAFE, MakeUnsafe_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS "::evalbytecode", EvalBytecode_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS TCL_FUNCTION, RegisterFunction_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CALL_METHOD,
             CallMethod_Cmd, duktape_data, NULL);
