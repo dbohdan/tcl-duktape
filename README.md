@@ -38,20 +38,21 @@ sudo make install
 * `::duktape::make-unsafe token` -> (nothing)`
 
 `make-safe` and `make-unsafe` control whether a new JavaScript function named
-`Duktape.tcl.eval()` is created which allows for evaluation of arbitrary Tcl
+`Duktape.tcl.eval()` is created that allows for evaluation of arbitrary Tcl
 scripts.
 
-The optional `returnType` argument to tcl-function may be one of:
-  * boolean (results in a boolean)
-  * bytearray (results in a buffer)
-  * string (default; results in a string)
-  * undefined (return value ignored)
-  * null (results in a null, regardless of the actual data)
-  * double (results in a number)
-  * integer (same as double!)
-  * bigint (string representation as a string)
-  * json (expects a JSON string which is converted to an object)
-  * arraylist itemType... (for each item in the array, encode as the itemType, result is an array)
+The optional `returnType` argument to `tcl-function` may be one of:
+  * `boolean` — results in a boolean
+  * `bytearray` — results in a Duktape [buffer](https://duktape.org/guide.html#bufferobjects)
+  * `string` — default; results in a string
+  * `undefined` — return value ignored
+  * `null` — results in a JavaScript null regardless of the actual data
+  * `double` — results in a number
+  * `integer` — same as `double`
+  * `bigint` — results in a JavaScript string representation of an integer
+  * `json` — expects a JSON string; the result is the string decoded as JSON
+  * `arraylist itemType...` — for each item in the array, encode as `itemType`;
+                              the result is an array
 
 ### TclOO wrapper
 
