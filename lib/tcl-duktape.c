@@ -24,6 +24,7 @@
 #define MAKE_UNSAFE "::make-unsafe"
 #define CLOSE "::close"
 #define EVAL "::eval"
+#define EVALLAMBDA "::evallambda"
 #define TCL_FUNCTION "::tcl-function"
 #define CALL_METHOD "::call-method"
 
@@ -47,6 +48,7 @@
 #define USAGE_MAKE_UNSAFE "token"
 #define USAGE_CLOSE "token"
 #define USAGE_EVAL "token code"
+#define USAGE_EVALLAMBDA "token bytecode lambdaHandle args"
 #define USAGE_TCL_FUNCTION "token name ?returnType? args body"
 #define USAGE_CALL_METHOD "token method this ?{arg ?type?}? ..."
 
@@ -60,8 +62,19 @@ struct DuktapeData
 
 struct DuktapeInstanceData {
     Tcl_Interp *interp;
+    Tcl_Obj *handle;
     duk_context *ctx;
+    struct DuktapeData *cdata;
     int isUnsafe;
+    int lambdaCount;
+};
+
+struct DuktapeLambdaInstanceData {
+    int refCount;
+    struct DuktapeData *cdata;
+    Tcl_Obj *handle;
+    Tcl_Obj *lambdaName;
+    Tcl_Obj *bytecode;
 };
 
 #define DUKTCL_CDATA ((struct DuktapeData *) cdata)
@@ -77,12 +90,16 @@ parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
 
     hashPtr = Tcl_FindHashEntry(&DUKTCL_CDATA->table, Tcl_GetString(idobj));
     if (hashPtr == NULL) {
-        Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_TOKEN, -1));
+        if (interp) {
+            Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_TOKEN, -1));
+        }
         return NULL;
     }
     instanceData = (struct DuktapeInstanceData *) Tcl_GetHashValue(hashPtr);
     if (!instanceData) {
-        Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_INVALID_INSTANCE, -1));
+        if (interp) {
+            Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_INVALID_INSTANCE, -1));
+        }
         return(NULL);
     }
     ctx = instanceData->ctx;
@@ -91,6 +108,210 @@ parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
         ckfree(instanceData);
     }
     return ctx;
+}
+
+/*
+ * Deal with Duktape Lambdas using a custom Tcl Obj type which
+ * we can use to free the lambda when the object goes away
+ */
+/**
+ ** Free a Duktape lambda object when the Tcl one is freed
+ ** also free all the internal mechanisms required to get
+ ** this far
+ **/
+static void Tclduk_LambdaObjType_Free(Tcl_Obj *lambdaObj) {
+    struct DuktapeLambdaInstanceData *instanceData;
+    ClientData cdata;
+    Tcl_Obj *handle, *lambdaNameObj, *bytecode;
+    const char *lambdaName;
+    int lambdaNameLength;
+    duk_context *ctx;
+
+    instanceData = lambdaObj->internalRep.otherValuePtr;
+
+    instanceData->refCount--;
+
+    if (instanceData->refCount > 0) {
+        return;
+    }
+
+    cdata         = instanceData->cdata;
+    lambdaNameObj = instanceData->lambdaName;
+    handle        = instanceData->handle;
+    bytecode      = instanceData->bytecode;
+
+    ckfree(instanceData);
+
+    Tcl_DecrRefCount(bytecode);
+
+    /*
+     * Find the Duktape heap context from the interp+handle
+     */
+    ctx = parse_id(cdata, NULL, handle, 0);
+    Tcl_DecrRefCount(handle);
+    if (ctx == NULL) {
+        Tcl_DecrRefCount(lambdaNameObj);
+        return;
+    }
+
+    /*
+     * Delete the object from the Duktape's global stash
+     */
+    lambdaName = Tcl_GetStringFromObj(lambdaNameObj, &lambdaNameLength);
+    duk_push_global_stash(ctx);                                      /* => ... [stash] */
+    duk_get_prop_literal(ctx, -1, "freeableLambdas");                /* => ... [stash] [object|undefined] */
+    if (duk_is_undefined(ctx, -1)) {
+        duk_pop(ctx);                                                /* => ... [stash] */
+        duk_push_object(ctx);                                        /* => ... [stash] [object] */
+    }
+    duk_push_true(ctx);                                              /* => ... [stash] [object] [true] */
+    duk_put_prop_lstring(ctx, -2, lambdaName, lambdaNameLength);     /* => ... [stash] [object.lambdaName=true] */
+    duk_put_prop_literal(ctx, -2, "freeableLambdas");                /* => ... [stash.freeableLambdas=object] */
+    duk_pop(ctx);                                                    /* => ... */
+
+    /*
+     * Finish cleanup
+     */
+    Tcl_DecrRefCount(lambdaNameObj);
+
+    return;
+}
+
+static void Tclduk_LambdaObjType_Dup(Tcl_Obj *src, Tcl_Obj *dest) {
+    struct DuktapeLambdaInstanceData *instanceData;
+
+    instanceData = src->internalRep.otherValuePtr;
+
+    instanceData->refCount++;
+
+    dest->internalRep.otherValuePtr = instanceData;
+
+    return;
+}
+
+static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
+    struct DuktapeLambdaInstanceData *instanceData;
+    Tcl_Obj *handle, *lambdaName, *bytecode;
+    Tcl_Obj *dukStringObj, *dukItemObj, *dukCodeObj, *dukCodeLineObj;
+    char *stringRep;
+    int stringRepLength;
+
+    instanceData = lambdaObj->internalRep.otherValuePtr;
+
+    lambdaName = instanceData->lambdaName;
+    handle     = instanceData->handle;
+    bytecode   = instanceData->bytecode;
+
+    dukStringObj = Tcl_NewObj();
+    dukItemObj = Tcl_NewObj();
+    dukCodeObj = Tcl_NewObj();
+
+    /*
+     * Set the bytecode
+     */
+    dukCodeLineObj = Tcl_NewObj();
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("code", -1));
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, bytecode);
+    Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
+    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
+
+    /*
+     * Set the Duktape lambda handle
+     */
+    dukCodeLineObj = Tcl_NewObj();
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("lambdaName", -1));
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, lambdaName);
+    Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
+    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
+
+    /*
+     * Set the Duktape token handle
+     */
+    dukCodeLineObj = Tcl_NewObj();
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("handle", -1));
+    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, handle);
+    Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
+    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
+
+    /*
+     * Add the evaluation commands
+     */
+    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("return [" NS "::evallambda $handle $code $lambdaName {*}$args]", -1));
+
+    /*
+     * Produce a Tcl lambda
+     */
+    Tcl_ListObjAppendElement(NULL, dukItemObj, Tcl_NewStringObj("args", -1));
+    Tcl_ListObjAppendElement(NULL, dukItemObj, dukCodeObj);
+    Tcl_ListObjAppendElement(NULL, dukStringObj, Tcl_NewStringObj("apply", -1));
+    Tcl_ListObjAppendElement(NULL, dukStringObj, dukItemObj);
+
+    /*
+     * Use this string rep as our object's string rep
+     */
+    stringRep = Tcl_GetStringFromObj(dukStringObj, &stringRepLength);
+    lambdaObj->bytes  = ckalloc(stringRepLength + 1);
+    lambdaObj->bytes[stringRepLength] = '\0';
+
+    memcpy(lambdaObj->bytes, stringRep, stringRepLength);
+    lambdaObj->length = stringRepLength;
+
+    /*
+     * Free the temporary object
+     */
+    Tcl_DecrRefCount(dukStringObj);
+}
+
+static int Tclduk_LambdaObjType_Set(Tcl_Interp *interp, Tcl_Obj *lambdaObj) {
+abort();
+/* XXX:TODO */
+/* XXX:Parse the Tcl lambda to extract the features we care about and internalize them */
+/* XXX:The JS Lambda Handle should not be considered because we have a different instanceData and no way to merge them */
+}
+
+/**
+ ** Process-wide reference to the Lambda Object Type
+ ** so it may be registered with Tcl.
+ **/
+static Tcl_ObjType Tclduk_LambdaObjType = {
+    "duktape_lambda" /* name */,
+    Tclduk_LambdaObjType_Free,
+    Tclduk_LambdaObjType_Dup,
+    Tclduk_LambdaObjType_String,
+    Tclduk_LambdaObjType_Set
+};
+
+/**
+ ** Allocate a new Tcl_Obj for a Lambda Object
+ **/
+static Tcl_Obj *Tclduk_LambdaObjType_New(ClientData cdata, Tcl_Obj *handle, Tcl_Obj *lambdaName, Tcl_Obj *bytecode) {
+    struct DuktapeLambdaInstanceData *instanceData;
+    Tcl_Obj *retval;
+
+    instanceData = ckalloc(sizeof(*instanceData));
+    retval       = ckalloc(sizeof(*retval));
+
+    retval->refCount = 0;
+    retval->bytes    = NULL;
+    retval->length   = 0;
+    retval->typePtr  = &Tclduk_LambdaObjType;
+
+    instanceData->refCount = 1;
+    instanceData->cdata  = cdata;
+    instanceData->handle = handle;
+    instanceData->bytecode = bytecode;
+    instanceData->lambdaName = lambdaName;
+
+    Tcl_IncrRefCount(handle);
+    Tcl_IncrRefCount(lambdaName);
+    Tcl_IncrRefCount(bytecode);
+
+    retval->internalRep.otherValuePtr = instanceData;
+
+    return(retval);
 }
 
 static void
@@ -104,9 +325,13 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
     hashPtr = Tcl_FirstHashEntry(&DUKTCL_CDATA->table, &search);
     while (hashPtr != NULL) {
         instanceData = (struct DuktapeInstanceData *) Tcl_GetHashValue(hashPtr);
-        ctx = instanceData->ctx;
         Tcl_SetHashValue(hashPtr, (ClientData) NULL);
+
+        ctx = instanceData->ctx;
         duk_destroy_heap(ctx);
+
+        Tcl_DecrRefCount(instanceData->handle);
+
         ckfree(instanceData);
         hashPtr = Tcl_NextHashEntry(&search);
     }
@@ -120,12 +345,59 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
 /*
  * Convert JavaScript item to a Tcl item
  */
+static Tcl_Obj *Tclduk_JSToTcl_function(duk_context *ctx, duk_idx_t idx) {
+    struct DuktapeInstanceData *instanceData;
+    duk_memory_functions funcs;
+    struct DuktapeData *cdata;
+    const char *dukString;
+    Tcl_Obj *dukStringObj, *dukCodeByteCodeObj;
+    Tcl_Obj *handle, *lambdaNameObj;
+    duk_size_t dukStringLength;
+
+    duk_get_memory_functions(ctx, &funcs);
+    instanceData = funcs.udata;
+
+    handle = instanceData->handle;
+    cdata  = instanceData->cdata;
+
+    lambdaNameObj = Tcl_ObjPrintf("lambda_%i%i%i_%i", rand(), rand(), rand(), instanceData->lambdaCount);
+    instanceData->lambdaCount++;
+
+    idx = duk_normalize_index(ctx, idx);
+    duk_push_global_stash(ctx);                                 /* => ... [stash] */
+    duk_dup(ctx, idx);                                          /* => ... [stash] [function] */
+    duk_dump_function(ctx);                                     /* => ... [stash] [bytecode] */
+    duk_base64_encode(ctx, -1);                                 /* => ... [stash] [bytecode.b64] */
+    dukString = duk_safe_to_lstring(ctx, -1, &dukStringLength); /* => ... [stash] [bytecode.b64] */
+    dukCodeByteCodeObj = Tcl_NewStringObj(dukString, dukStringLength);
+    duk_pop(ctx);                                               /* => ... [stash] */
+    duk_dup(ctx, idx);                                          /* => ... [stash] [function] */
+    duk_put_prop_string(ctx, -2, Tcl_GetStringFromObj(lambdaNameObj, NULL));   /* => ... [stash] */
+
+    duk_get_prop_literal(ctx, -1, "freeableLambdas");           /* => ... [stash] [freeableLambdas] */
+    if (!duk_is_undefined(ctx, -1)) {
+        duk_enum(ctx, -1, 0);                                   /* => ... [stash] [freeableLambdas] [enum] */
+        while (duk_next(ctx, -1, 0)) {                          /* => ... [stash] [freeableLambdas] [enum] [key] */
+            duk_del_prop(ctx, -4);                              /* => ... [stash] [freeableLambdas] [enum] */
+        }
+        duk_pop(ctx);                                           /* => ... [stash] [freeableLambdas] */
+    }
+    duk_pop(ctx);                                               /* => ... [stash] */
+    duk_del_prop_literal(ctx, -1, "freeableLambdas");           /* => ... [stash] */
+
+    duk_pop(ctx);                                               /* => ... */
+
+    dukStringObj = Tclduk_LambdaObjType_New(cdata, handle, lambdaNameObj, dukCodeByteCodeObj);
+
+    return(dukStringObj);
+}
+
 static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
     const char *dukString;
     duk_size_t dukStringLength;
     duk_int_t arrayLength;
     duk_idx_t arrayIndex;
-    Tcl_Obj *dukStringObj, *dukItemObj, *dukCodeObj, *dukCodeLineObj, *dukCodeByteCodeObj;
+    Tcl_Obj *dukStringObj, *dukItemObj;
     enum {
         TCLDUK_TYPE_BYTEARRAY,
         TCLDUK_TYPE_STRING
@@ -163,36 +435,7 @@ static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
     }
 
     if (!dukString && !dukStringObj && duk_is_function(ctx, idx)) {
-        duk_dup(ctx, idx);
-        duk_dump_function(ctx);
-        duk_buffer_to_string(ctx, -1);
-        dukString = duk_safe_to_lstring(ctx, -1, &dukStringLength);
-        dukCodeByteCodeObj = Tcl_NewByteArrayObj((const unsigned char *) dukString, dukStringLength);
-        duk_pop(ctx);
-
-        dukStringObj = Tcl_NewObj();
-        dukItemObj = Tcl_NewObj();
-        dukCodeObj = Tcl_NewObj();
-        dukCodeLineObj = Tcl_NewObj();
-        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
-        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("code", -1));
-        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, dukCodeByteCodeObj);
-        Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
-        Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
-        dukCodeLineObj = Tcl_NewObj();
-        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
-        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("handle", -1));
-Tcl_Obj *handle; /* XXX:TODO */
-handle = Tcl_NewStringObj("::duktape::1", -1);
-        Tcl_ListObjAppendElement(NULL, dukCodeLineObj, handle);
-        Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
-        Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
-        Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("return [::duktape::evalbytecode $handle $code {*}$args]", -1));
-
-        Tcl_ListObjAppendElement(NULL, dukItemObj, Tcl_NewStringObj("args", -1));
-        Tcl_ListObjAppendElement(NULL, dukItemObj, dukCodeObj);
-        Tcl_ListObjAppendElement(NULL, dukStringObj, Tcl_NewStringObj("apply", -1));
-        Tcl_ListObjAppendElement(NULL, dukStringObj, dukItemObj);
+        dukStringObj = Tclduk_JSToTcl_function(ctx, idx);
     }
 
     if (!dukString && !dukStringObj && duk_is_buffer_data(ctx, idx)) {
@@ -227,7 +470,7 @@ handle = Tcl_NewStringObj("::duktape::1", -1);
 }
 
 /*
- * Convert Tcl item to a JavaScript item
+ * Convert Tcl item to a JavaScript item and push that item to the end of the stack
  */
 static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context *ctx, const char *type) {
     Tcl_Obj *typeObj, *firstTypeObj, *itemObj;
@@ -548,6 +791,8 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 
     instanceData = ckalloc(sizeof(*instanceData));
     instanceData->interp = interp;
+    instanceData->lambdaCount = 0;
+    instanceData->cdata = cdata;
 
     ctx = duk_create_heap(NULL, NULL, NULL, instanceData, NULL);
     if (ctx == NULL) {
@@ -560,6 +805,9 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 
     DUKTCL_CDATA->counter++;
     token = Tcl_ObjPrintf(NS "::%d", DUKTCL_CDATA->counter);
+    instanceData->handle = token;
+    Tcl_IncrRefCount(token);
+
     hashPtr = Tcl_CreateHashEntry(&DUKTCL_CDATA->table, Tcl_GetString(token),
             &isNew);
     Tcl_SetHashValue(hashPtr, (ClientData) instanceData);
@@ -616,6 +864,8 @@ static int MakeUnsafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Ob
 static int
 Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
+    struct DuktapeInstanceData *instanceData;
+    duk_memory_functions funcs;
     duk_context *ctx;
 
     if (objc != 2) {
@@ -629,6 +879,12 @@ Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     }
 
     duk_destroy_heap(ctx);
+
+    duk_get_memory_functions(ctx, &funcs);
+    instanceData = funcs.udata;
+
+    Tcl_DecrRefCount(instanceData->handle);
+
 
     return TCL_OK;
 }
@@ -707,16 +963,16 @@ static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, 
     return(TCL_OK);
 }
 
-static int EvalBytecode_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+static int EvalLambda_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
     duk_context *ctx;
-    Tcl_Obj *bytecodeObj, *result;
-    const unsigned char *bytecode;
-    int bytecodeLength;
+    Tcl_Obj *lambdaNameObj, *bytecodeObj, *result;
+    const char *lambdaName, *bytecode;
+    int lambdaNameLength, bytecodeLength;
     int idx;
     int retval;
 
-    if (objc < 3) {
-        Tcl_WrongNumArgs(interp, 1, objv, "XXX:TODO");
+    if (objc < 4) {
+        Tcl_WrongNumArgs(interp, 1, objv, USAGE_EVALLAMBDA);
         return(TCL_ERROR);
     }
 
@@ -726,17 +982,30 @@ static int EvalBytecode_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_
     }
 
     bytecodeObj = objv[2];
-    bytecode = Tcl_GetByteArrayFromObj(bytecodeObj, &bytecodeLength);
+    lambdaNameObj = objv[3];
+    lambdaName = Tcl_GetStringFromObj(lambdaNameObj, &lambdaNameLength);
 
-    duk_push_lstring(ctx, (const char *) bytecode, bytecodeLength);
-    duk_to_buffer(ctx, -1, NULL);
-    duk_load_function(ctx);
+    duk_push_global_stash(ctx);                                   /* => [stash] */
+    duk_get_prop_lstring(ctx, -1, lambdaName, lambdaNameLength);  /* => [stash] [function|undefined] */
+    if (duk_is_undefined(ctx, -1) || lambdaNameLength == 0) {
+        duk_pop(ctx);                                             /* => [stash] */
 
-    for (idx = 3; idx < objc; idx++) {
+        bytecode = Tcl_GetStringFromObj(bytecodeObj, &bytecodeLength);
+
+        duk_push_lstring(ctx, (const char *) bytecode, bytecodeLength); /* => [stash] [bytecodeString] */
+        duk_base64_decode(ctx, -1);                               /* => [stash] [bytecodebuffer] */
+        duk_load_function(ctx);                                   /* => [stash] [function] */
+    }
+
+    /*
+     * Push each argument to the stack
+     * => [stash] [function] [args...]
+     */
+    for (idx = 4; idx < objc; idx++) {
         Tclduk_TclToJS(interp, objv[idx], ctx, NULL);
     }
 
-    duk_call(ctx, objc - 3);
+    duk_call(ctx, objc - 4);                                      /* => [stash] [result] */
 
     retval = TCL_OK;
     if (duk_is_error(ctx, -1)) {
@@ -744,12 +1013,14 @@ static int EvalBytecode_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_
     }
 
     result = Tclduk_JSToTcl(ctx, -1);
-    duk_pop(ctx);
+    duk_pop(ctx);                                                 /* => [stash] */
+    duk_pop(ctx);                                                 /* => */
 
     Tcl_SetObjResult(interp, result);
 
     return(retval);
 }
+
 
 /*
  * Evaluate a string as Duktape code in the selected heap.
@@ -947,12 +1218,14 @@ Tclduktape_Init(Tcl_Interp *interp)
     duktape_data->counter = 0;
     Tcl_InitHashTable(&duktape_data->table, TCL_STRING_KEYS);
 
+    Tcl_RegisterObjType(&Tclduk_LambdaObjType);
+
     Tcl_CreateObjCommand(interp, NS INIT, Init_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS MAKE_SAFE, MakeSafe_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS MAKE_UNSAFE, MakeUnsafe_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS "::evalbytecode", EvalBytecode_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS EVALLAMBDA, EvalLambda_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS TCL_FUNCTION, RegisterFunction_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CALL_METHOD,
             CallMethod_Cmd, duktape_data, NULL);
