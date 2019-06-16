@@ -145,7 +145,7 @@ static void Tclduk_LambdaObjType_Free(Tcl_Obj *lambdaObj) {
     Tcl_DecrRefCount(bytecode);
 
     /*
-     * Find the Duktape heap context from the interp+handle
+     * Find the Duktape heap context from the handle
      */
     ctx = parse_id(cdata, NULL, handle, 0);
     Tcl_DecrRefCount(handle);
@@ -155,19 +155,21 @@ static void Tclduk_LambdaObjType_Free(Tcl_Obj *lambdaObj) {
     }
 
     /*
-     * Delete the object from the Duktape's global stash
+     * Schedule the deletion of the lambda from Duktape
      */
-    lambdaName = Tcl_GetStringFromObj(lambdaNameObj, &lambdaNameLength);
-    duk_push_global_stash(ctx);                                      /* => ... [stash] */
-    duk_get_prop_literal(ctx, -1, "freeableLambdas");                /* => ... [stash] [object|undefined] */
-    if (duk_is_undefined(ctx, -1)) {
-        duk_pop(ctx);                                                /* => ... [stash] */
-        duk_push_object(ctx);                                        /* => ... [stash] [object] */
+    if (freeDukLambda) {
+        lambdaName = Tcl_GetStringFromObj(lambdaNameObj, &lambdaNameLength);
+        duk_push_global_stash(ctx);                                  /* => ... [stash] */
+        duk_get_prop_literal(ctx, -1, "freeableLambdas");            /* => ... [stash] [object|undefined] */
+        if (duk_is_undefined(ctx, -1)) {
+            duk_pop(ctx);                                            /* => ... [stash] */
+            duk_push_object(ctx);                                    /* => ... [stash] [object] */
+        }
+        duk_push_true(ctx);                                          /* => ... [stash] [object] [true] */
+        duk_put_prop_lstring(ctx, -2, lambdaName, lambdaNameLength); /* => ... [stash] [object.lambdaName=true] */
+        duk_put_prop_literal(ctx, -2, "freeableLambdas");            /* => ... [stash.freeableLambdas=object] */
+        duk_pop(ctx);                                                /* => ... */
     }
-    duk_push_true(ctx);                                              /* => ... [stash] [object] [true] */
-    duk_put_prop_lstring(ctx, -2, lambdaName, lambdaNameLength);     /* => ... [stash] [object.lambdaName=true] */
-    duk_put_prop_literal(ctx, -2, "freeableLambdas");                /* => ... [stash.freeableLambdas=object] */
-    duk_pop(ctx);                                                    /* => ... */
 
     /*
      * Finish cleanup
@@ -265,13 +267,6 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
     Tcl_DecrRefCount(dukStringObj);
 }
 
-static int Tclduk_LambdaObjType_Set(Tcl_Interp *interp, Tcl_Obj *lambdaObj) {
-abort();
-/* XXX:TODO */
-/* XXX:Parse the Tcl lambda to extract the features we care about and internalize them */
-/* XXX:The JS Lambda Handle should not be considered because we have a different instanceData and no way to merge them */
-}
-
 /**
  ** Process-wide reference to the Lambda Object Type
  ** so it may be registered with Tcl.
@@ -281,7 +276,7 @@ static Tcl_ObjType Tclduk_LambdaObjType = {
     Tclduk_LambdaObjType_Free,
     Tclduk_LambdaObjType_Dup,
     Tclduk_LambdaObjType_String,
-    Tclduk_LambdaObjType_Set
+    NULL
 };
 
 /**
@@ -987,6 +982,11 @@ static int EvalLambda_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Ob
 
     duk_push_global_stash(ctx);                                   /* => [stash] */
     duk_get_prop_lstring(ctx, -1, lambdaName, lambdaNameLength);  /* => [stash] [function|undefined] */
+
+    /*
+     * If the lambda name cannot be found in the list of closures
+     * use the bytecode
+     */
     if (duk_is_undefined(ctx, -1) || lambdaNameLength == 0) {
         duk_pop(ctx);                                             /* => [stash] */
 
@@ -1005,6 +1005,9 @@ static int EvalLambda_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Ob
         Tclduk_TclToJS(interp, objv[idx], ctx, NULL);
     }
 
+    /*
+     * Call the JavaScript function
+     */
     duk_call(ctx, objc - 4);                                      /* => [stash] [result] */
 
     retval = TCL_OK;
@@ -1020,7 +1023,6 @@ static int EvalLambda_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Ob
 
     return(retval);
 }
-
 
 /*
  * Evaluate a string as Duktape code in the selected heap.
