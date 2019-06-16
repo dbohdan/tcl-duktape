@@ -126,8 +126,11 @@ static void Tclduk_LambdaObjType_Free(Tcl_Obj *lambdaObj) {
     const char *lambdaName;
     int lambdaNameLength;
     duk_context *ctx;
+    int freeDukLambda;
 
     instanceData = lambdaObj->internalRep.otherValuePtr;
+
+    freeDukLambda = 1;
 
     instanceData->refCount--;
 
