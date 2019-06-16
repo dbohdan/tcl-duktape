@@ -167,11 +167,12 @@ static void Tclduk_LambdaObjType_Free(Tcl_Obj *lambdaObj) {
         if (duk_is_undefined(ctx, -1)) {
             duk_pop(ctx);                                            /* => ... [stash] */
             duk_push_object(ctx);                                    /* => ... [stash] [object] */
+            duk_dup(ctx, -1);                                        /* => ... [stash] [object] [object] */
+            duk_put_prop_literal(ctx, -3, "freeableLambdas");        /* => ... [stash.freeableLambdas=object] [object] */
         }
         duk_push_true(ctx);                                          /* => ... [stash] [object] [true] */
         duk_put_prop_lstring(ctx, -2, lambdaName, lambdaNameLength); /* => ... [stash] [object.lambdaName=true] */
-        duk_put_prop_literal(ctx, -2, "freeableLambdas");            /* => ... [stash.freeableLambdas=object] */
-        duk_pop(ctx);                                                /* => ... */
+        duk_pop_2(ctx);                                              /* => ... */
     }
 
     /*
@@ -1019,8 +1020,7 @@ static int EvalLambda_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Ob
     }
 
     result = Tclduk_JSToTcl(ctx, -1);
-    duk_pop(ctx);                                                 /* => [stash] */
-    duk_pop(ctx);                                                 /* => */
+    duk_pop_2(ctx);                                               /* => */
 
     Tcl_SetObjResult(interp, result);
 
