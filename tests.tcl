@@ -241,6 +241,36 @@ namespace eval ::duktape::tests {
         return $result
     } -result PASS
 
+    tcltest::test test12 {JavaScript Closure} -setup $setup -body {
+        set dt [::duktape::init]
+        ::duktape::tcl-function $dt tcleval {args} {
+            return [::eval {*}$args]
+        }
+        set result [::duktape::eval $dt {
+            function generator() {
+                var count = 0;
+                return(function() {
+                    count++;
+                    return(count);
+                });
+            }
+
+            counter1 = generator();
+            counter2 = generator();
+            counter1();         /* 1 */
+            counter2();         /* 1 */
+            counter1();         /* 2 */
+            tcleval(counter2);  /* 2 */
+            tcleval(counter1);  /* 3 */
+            tcleval(counter1);  /* 4 */
+            tcleval(counter2);  /* 3 */
+            counter1();         /* 5 */
+            counter1() + counter2(); /* 6 + 4 = 10 */
+        }]
+        ::duktape::close $dt
+        return $result
+    } -result 10
+
     tcltest::cleanupTests
     # Exit with nonzero status if there are failed tests.
     if {$::tcltest::numTests(Failed) > 0} {
