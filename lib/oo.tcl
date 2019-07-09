@@ -77,6 +77,11 @@ namespace eval ::duktape::oo {}
         ::duktape::js-proc $id $procName $arguments $body
         ::oo::objdefine [self object] forward $name $procName
     }
+
+    method token {} {
+        my variable id
+        return $id
+    }
 }
 
 # JSON object.

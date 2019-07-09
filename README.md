@@ -65,6 +65,7 @@ The optional `returnType` argument to `tcl-function` may be one of:
 * `$objName call-(str|num) function ?arg?` -> (evaluation result)
 * `$objName js-proc name arguments body` -> (nothing)
 * `$objName js-method name arguments body` -> (nothing)
+* `$objName token` -> token (for the procedural API)
 
 `js-method` defines a new method in JavaScript on the Duktape object instance
 `$objName`.

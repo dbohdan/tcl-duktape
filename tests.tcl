@@ -72,7 +72,7 @@ namespace eval ::duktape::tests {
         return $result
     } -result {0 2.8414709848078967}
 
-    tcltest::test test4 {oo} \
+    tcltest::test test4.1 {oo} \
             -setup $setup \
             -constraints tcloo \
             -body {
@@ -101,7 +101,24 @@ namespace eval ::duktape::tests {
         return $result
     } -result {catch:1 0 2.8414709848078967 1}
 
-    tcltest::test test4 {JSON object} \
+    tcltest::test test4.2 {oo token} \
+            -setup $setup \
+            -constraints tcloo \
+            -body {
+        package require duktape::oo
+
+        set result {}
+        set duktapeInterp [::duktape::oo::Duktape new]
+        $duktapeInterp eval {
+            var n = 42 + 108;
+        }
+        set result [::duktape::eval [$duktapeInterp token] n]
+
+        $duktapeInterp destroy
+        return $result
+    } -result 150
+
+    tcltest::test test5 {JSON object} \
             -setup $setup \
             -constraints tcloo \
             -body {
