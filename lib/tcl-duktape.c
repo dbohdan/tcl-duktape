@@ -245,7 +245,7 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
     /*
      * Add the evaluation commands
      */
-    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("return [" NS "::evallambda $handle $code $lambdaName {*}$args]", -1));
+    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("return [" NS EVALLAMBDA " $handle $code $lambdaName {*}$args]", -1));
 
     /*
      * Produce a Tcl lambda
