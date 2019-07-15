@@ -24,7 +24,7 @@
 #define MAKE_UNSAFE "::make-unsafe"
 #define CLOSE "::close"
 #define EVAL "::eval"
-#define EVALLAMBDA "::evallambda"
+#define EVAL_LAMBDA "::eval-lambda"
 #define TCL_FUNCTION "::tcl-function"
 #define CALL_METHOD "::call-method"
 
@@ -48,7 +48,7 @@
 #define USAGE_MAKE_UNSAFE "token"
 #define USAGE_CLOSE "token"
 #define USAGE_EVAL "token code"
-#define USAGE_EVALLAMBDA "token bytecode lambdaHandle args"
+#define USAGE_EVAL_LAMBDA "token bytecode lambdaHandle args"
 #define USAGE_TCL_FUNCTION "token name ?returnType? args body"
 #define USAGE_CALL_METHOD "token method this ?{arg ?type?}? ..."
 
@@ -245,7 +245,7 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
     /*
      * Add the evaluation commands
      */
-    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("return [" NS EVALLAMBDA " $handle $code $lambdaName {*}$args]", -1));
+    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("return [" NS EVAL_LAMBDA " $handle $code $lambdaName {*}$args]", -1));
 
     /*
      * Produce a Tcl lambda
@@ -971,7 +971,7 @@ static int EvalLambda_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Ob
     int retval;
 
     if (objc < 4) {
-        Tcl_WrongNumArgs(interp, 1, objv, USAGE_EVALLAMBDA);
+        Tcl_WrongNumArgs(interp, 1, objv, USAGE_EVAL_LAMBDA);
         return(TCL_ERROR);
     }
 
@@ -1230,7 +1230,7 @@ Tclduktape_Init(Tcl_Interp *interp)
     Tcl_CreateObjCommand(interp, NS MAKE_UNSAFE, MakeUnsafe_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS EVALLAMBDA, EvalLambda_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(interp, NS EVAL_LAMBDA, EvalLambda_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS TCL_FUNCTION, RegisterFunction_Cmd, duktape_data, NULL);
     Tcl_CreateObjCommand(interp, NS CALL_METHOD,
             CallMethod_Cmd, duktape_data, NULL);
