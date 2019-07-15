@@ -98,7 +98,8 @@ parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
     instanceData = (struct DuktapeInstanceData *) Tcl_GetHashValue(hashPtr);
     if (!instanceData) {
         if (interp) {
-            Tcl_SetObjResult(interp, Tcl_NewStringObj(ERROR_INVALID_INSTANCE, -1));
+            Tcl_SetObjResult(interp,
+                             Tcl_NewStringObj(ERROR_INVALID_INSTANCE, -1));
         }
         return(NULL);
     }
@@ -216,8 +217,16 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
      * Set the bytecode
      */
     dukCodeLineObj = Tcl_NewObj();
-    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
-    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("code", -1));
+    Tcl_ListObjAppendElement(
+        NULL,
+        dukCodeLineObj,
+        Tcl_NewStringObj("set", -1)
+    );
+    Tcl_ListObjAppendElement(
+        NULL,
+        dukCodeLineObj,
+        Tcl_NewStringObj("code", -1)
+    );
     Tcl_ListObjAppendElement(NULL, dukCodeLineObj, bytecode);
     Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
     Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
@@ -226,8 +235,16 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
      * Set the Duktape lambda handle
      */
     dukCodeLineObj = Tcl_NewObj();
-    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
-    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("lambdaName", -1));
+    Tcl_ListObjAppendElement(
+        NULL,
+        dukCodeLineObj,
+        Tcl_NewStringObj("set", -1)
+    );
+    Tcl_ListObjAppendElement(
+        NULL,
+        dukCodeLineObj,
+        Tcl_NewStringObj("lambdaName", -1)
+    );
     Tcl_ListObjAppendElement(NULL, dukCodeLineObj, lambdaName);
     Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
     Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
@@ -236,8 +253,16 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
      * Set the Duktape token handle
      */
     dukCodeLineObj = Tcl_NewObj();
-    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("set", -1));
-    Tcl_ListObjAppendElement(NULL, dukCodeLineObj, Tcl_NewStringObj("handle", -1));
+    Tcl_ListObjAppendElement(
+        NULL,
+        dukCodeLineObj,
+        Tcl_NewStringObj("set", -1)
+    );
+    Tcl_ListObjAppendElement(
+        NULL,
+        dukCodeLineObj,
+        Tcl_NewStringObj("handle", -1)
+    );
     Tcl_ListObjAppendElement(NULL, dukCodeLineObj, handle);
     Tcl_AppendObjToObj(dukCodeObj, dukCodeLineObj);
     Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("\n", -1));
@@ -245,7 +270,13 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
     /*
      * Add the evaluation commands
      */
-    Tcl_AppendObjToObj(dukCodeObj, Tcl_NewStringObj("return [" NS EVAL_LAMBDA " $handle $code $lambdaName {*}$args]", -1));
+    Tcl_AppendObjToObj(
+        dukCodeObj,
+        Tcl_NewStringObj(
+            "return [" NS EVAL_LAMBDA " $handle $code $lambdaName {*}$args]",
+            -1
+        )
+    );
 
     /*
      * Produce a Tcl lambda
@@ -286,7 +317,13 @@ static Tcl_ObjType Tclduk_LambdaObjType = {
 /**
  ** Allocate a new Tcl_Obj for a Lambda Object
  **/
-static Tcl_Obj *Tclduk_LambdaObjType_New(ClientData cdata, Tcl_Obj *handle, Tcl_Obj *lambdaName, Tcl_Obj *bytecode) {
+static Tcl_Obj *Tclduk_LambdaObjType_New(
+    ClientData cdata,
+    Tcl_Obj *handle,
+    Tcl_Obj *lambdaName,
+    Tcl_Obj *bytecode
+)
+{
     struct DuktapeLambdaInstanceData *instanceData;
     Tcl_Obj *retval;
 
@@ -359,7 +396,13 @@ static Tcl_Obj *Tclduk_JSToTcl_function(duk_context *ctx, duk_idx_t idx) {
     handle = instanceData->handle;
     cdata  = instanceData->cdata;
 
-    lambdaNameObj = Tcl_ObjPrintf("lambda_%i%i%i_%i", rand(), rand(), rand(), instanceData->lambdaCount);
+    lambdaNameObj = Tcl_ObjPrintf(
+        "lambda_%i%i%i_%i",
+        rand(),
+        rand(),
+        rand(),
+        instanceData->lambdaCount
+    );
     instanceData->lambdaCount++;
 
     idx = duk_normalize_index(ctx, idx);
@@ -386,7 +429,12 @@ static Tcl_Obj *Tclduk_JSToTcl_function(duk_context *ctx, duk_idx_t idx) {
 
     duk_pop(ctx);                                               /* => ... */
 
-    dukStringObj = Tclduk_LambdaObjType_New(cdata, handle, lambdaNameObj, dukCodeByteCodeObj);
+    dukStringObj = Tclduk_LambdaObjType_New(
+        cdata,
+        handle,
+        lambdaNameObj,
+        dukCodeByteCodeObj
+    );
 
     return(dukStringObj);
 }
@@ -413,7 +461,11 @@ static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
     dukString = NULL;
     dukStringObj = NULL;
     string_format = TCLDUK_TYPE_STRING;
-    if (duk_check_type_mask(ctx, idx, DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_UNDEFINED)) {
+    if (duk_check_type_mask(
+            ctx,
+            idx,
+            DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_UNDEFINED
+        )) {
         dukString = "";
         dukStringLength = 0;
     }
@@ -442,7 +494,9 @@ static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
         string_format = TCLDUK_TYPE_BYTEARRAY;
     }
 
-    if (!dukString && !dukStringObj && duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
+    if (!dukString
+        && !dukStringObj
+        && duk_check_type(ctx, idx, DUK_TYPE_OBJECT)) {
         duk_json_encode(ctx, idx);
     }
 
@@ -457,7 +511,10 @@ static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
 
         switch (string_format) {
             case TCLDUK_TYPE_BYTEARRAY:
-                dukStringObj = Tcl_NewByteArrayObj((const unsigned char *) dukString, dukStringLength);
+                dukStringObj = Tcl_NewByteArrayObj(
+                    (const unsigned char *) dukString,
+                    dukStringLength
+                );
                 break;
             case TCLDUK_TYPE_STRING:
                 dukStringObj = Tcl_NewStringObj(dukString, dukStringLength);
@@ -471,7 +528,13 @@ static Tcl_Obj *Tclduk_JSToTcl(duk_context *ctx, duk_idx_t idx) {
 /*
  * Convert Tcl item to a JavaScript item and push that item to the end of the stack
  */
-static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context *ctx, const char *type) {
+static duk_idx_t Tclduk_TclToJS(
+    Tcl_Interp *interp,
+    Tcl_Obj *value,
+    duk_context *ctx,
+    const char *type
+)
+{
     Tcl_Obj *typeObj, *firstTypeObj, *itemObj;
     char *firstTypeString, *otherTypesString;
     const char *valueString;
@@ -508,9 +571,16 @@ static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context 
     if (tclRet != TCL_OK || !firstTypeObj) {
         firstTypeObj = typeObj;
     }
-    firstTypeString = Tcl_GetStringFromObj(firstTypeObj, &firstTypeStringLength);
+    firstTypeString = Tcl_GetStringFromObj(
+        firstTypeObj,
+        &firstTypeStringLength
+    );
 
-    type_hash = Tcl_ZlibCRC32(0, (const unsigned char *) firstTypeString, firstTypeStringLength);
+    type_hash = Tcl_ZlibCRC32(
+        0,
+        (const unsigned char *) firstTypeString,
+        firstTypeStringLength
+    );
 
     switch (type_hash) {
         case 0x0: /* (empty string) */
@@ -564,7 +634,10 @@ static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context 
             duk_push_null(ctx);
             return(1);
         case TCLDUK_TYPE_BYTEARRAY:
-            valueString = (const char *) Tcl_GetByteArrayFromObj(value, &valueStringLength);
+            valueString = (const char *) Tcl_GetByteArrayFromObj(
+                value,
+                &valueStringLength
+            );
             duk_push_lstring(ctx, valueString, valueStringLength);
             duk_to_buffer(ctx, -1, NULL);
             return(1);
@@ -615,7 +688,12 @@ static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context 
                 if (tclRet != TCL_OK) {
                     duk_push_null(ctx);
                 } else {
-                    checkRet = Tclduk_TclToJS(interp, itemObj, ctx, otherTypesString);
+                    checkRet = Tclduk_TclToJS(
+                        interp,
+                        itemObj,
+                        ctx,
+                        otherTypesString
+                    );
                     if (checkRet == 0) {
                         duk_push_null(ctx);
                     } else if (checkRet != 1) {
@@ -634,7 +712,9 @@ static duk_idx_t Tclduk_TclToJS(Tcl_Interp *interp, Tcl_Obj *value, duk_context 
 /*
  * Evaluate a Tcl string and return the result to JavaScript
  */
-static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx, const char *returnType) {
+static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp,
+                                         duk_context *ctx,
+                                         const char *returnType) {
     Tcl_Obj *evalScript, *evalResult, *dukStringObj;
     duk_idx_t numArgs, numRetVals;
     int tclRet;
@@ -642,7 +722,12 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx, c
 
     numArgs = duk_get_top(ctx);
     if (numArgs < 0) {
-        duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INTERNAL_ARGS_ERROR);
+        duk_push_error_object(
+            ctx,
+            DUK_ERR_ERROR,
+            "%s",
+            ERROR_INTERNAL_ARGS_ERROR
+        );
         return(duk_throw(ctx));
     }
 
@@ -650,13 +735,23 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx, c
     for (idx = 0; idx < numArgs; idx++) {
         dukStringObj = Tclduk_JSToTcl(ctx, idx);
         if (!dukStringObj) {
-            duk_push_error_object(ctx, DUK_ERR_TYPE_ERROR, "%s", ERROR_INVALID_STRING);
+            duk_push_error_object(
+                ctx,
+                DUK_ERR_TYPE_ERROR,
+                "%s",
+                ERROR_INVALID_STRING
+            );
             return(duk_throw(ctx));
         }
 
         tclRet = Tcl_ListObjAppendElement(interp, evalScript, dukStringObj);
         if (tclRet != TCL_OK) {
-            duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", ERROR_INTERNAL_TCL_LAPPEND);
+            duk_push_error_object(
+                ctx,
+                DUK_ERR_ERROR,
+                "%s",
+                ERROR_INTERNAL_TCL_LAPPEND
+            );
             return(duk_throw(ctx));
         }
     }
@@ -666,7 +761,12 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp, duk_context *ctx, c
 
     tclRet = Tcl_EvalObjEx(interp, evalScript, 0);
     if (tclRet != TCL_OK) {
-        duk_push_error_object(ctx, DUK_ERR_ERROR, "%s", Tcl_GetStringResult(interp));
+        duk_push_error_object(
+            ctx,
+            DUK_ERR_ERROR,
+            "%s",
+            Tcl_GetStringResult(interp)
+        );
         return(duk_throw(ctx));
     }
 
@@ -782,7 +882,11 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
             Tcl_WrongNumArgs(interp, 1, objv, USAGE_INIT);
             return TCL_ERROR;
         }
-        tclRet = Tcl_GetBoolean(interp, Tcl_GetStringFromObj(objv[2], NULL), &makeSafe);
+        tclRet = Tcl_GetBoolean(
+            interp,
+            Tcl_GetStringFromObj(objv[2], NULL),
+            &makeSafe
+        );
         if (tclRet != TCL_OK) {
             return(tclRet);
         }
@@ -819,7 +923,13 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     return TCL_OK;
 }
 
-static int MakeSafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+static int MakeSafe_Cmd(
+    ClientData cdata,
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const objv[]
+)
+{
     duk_context *ctx;
 
     if (objc != 2) {
@@ -837,7 +947,13 @@ static int MakeSafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj 
     return(TCL_OK);
 }
 
-static int MakeUnsafe_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+static int MakeUnsafe_Cmd(
+    ClientData cdata,
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const objv[]
+)
+{
     duk_context *ctx;
 
     if (objc != 2) {
@@ -920,7 +1036,13 @@ static duk_ret_t EvalTclCmdFromJS(duk_context *ctx) {
     return(EvalTclFromJSWithInterp(interp, ctx, returnType));
 }
 
-static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+static int RegisterFunction_Cmd(
+    ClientData cdata,
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const objv[]
+)
+{
     duk_context *ctx;
     Tcl_Obj *lambdaObj;
     const char *functionName, *returnType, *lambdaString;
@@ -962,7 +1084,13 @@ static int RegisterFunction_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, 
     return(TCL_OK);
 }
 
-static int EvalLambda_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+static int EvalLambda_Cmd(
+    ClientData cdata,
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const objv[]
+)
+{
     duk_context *ctx;
     Tcl_Obj *lambdaNameObj, *bytecodeObj, *result;
     const char *lambdaName, *bytecode;
@@ -1074,8 +1202,12 @@ Eval_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
  * Side effects: may change the Duktape interpreter heap.
  */
 static int
-CallMethod_Cmd(ClientData cdata, Tcl_Interp *interp, int objc,
-        Tcl_Obj *const objv[])
+CallMethod_Cmd(
+    ClientData cdata,
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj *const objv[]
+)
 {
     int i;
     int list_length;
@@ -1225,15 +1357,30 @@ Tclduktape_Init(Tcl_Interp *interp)
 
     Tcl_RegisterObjType(&Tclduk_LambdaObjType);
 
-    Tcl_CreateObjCommand(interp, NS INIT, Init_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS MAKE_SAFE, MakeSafe_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS MAKE_UNSAFE, MakeUnsafe_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS CLOSE, Close_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS EVAL, Eval_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS EVAL_LAMBDA, EvalLambda_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS TCL_FUNCTION, RegisterFunction_Cmd, duktape_data, NULL);
-    Tcl_CreateObjCommand(interp, NS CALL_METHOD,
-            CallMethod_Cmd, duktape_data, NULL);
+    Tcl_CreateObjCommand(
+        interp, NS INIT, Init_Cmd, duktape_data, NULL
+    );
+    Tcl_CreateObjCommand(
+        interp, NS MAKE_SAFE, MakeSafe_Cmd, duktape_data, NULL
+    );
+    Tcl_CreateObjCommand(
+        interp, NS MAKE_UNSAFE, MakeUnsafe_Cmd, duktape_data, NULL
+    );
+    Tcl_CreateObjCommand(
+        interp, NS CLOSE, Close_Cmd, duktape_data, NULL
+    );
+    Tcl_CreateObjCommand(
+        interp, NS EVAL, Eval_Cmd, duktape_data, NULL
+    );
+    Tcl_CreateObjCommand(
+        interp, NS EVAL_LAMBDA, EvalLambda_Cmd, duktape_data, NULL
+    );
+    Tcl_CreateObjCommand(
+        interp, NS TCL_FUNCTION, RegisterFunction_Cmd, duktape_data, NULL
+    );
+    Tcl_CreateObjCommand(
+        interp, NS CALL_METHOD, CallMethod_Cmd, duktape_data, NULL
+    );
     Tcl_CallWhenDeleted(interp, cleanup_interp, duktape_data);
     Tcl_PkgProvide(interp, PACKAGE, VERSION);
 
