@@ -1,6 +1,6 @@
 /*
  * Tcl bindings for Duktape.
- * Copyright (c) 2015, 2016, 2017, 2018, 2019
+ * Copyright (c) 2015, 2016, 2017, 2018, 2019, 2020
  * dbohdan and contributors listed in AUTHORS
  * This code is released under the terms of the MIT license. See the file
  * LICENSE for details.
@@ -98,8 +98,10 @@ parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
     instanceData = (struct DuktapeInstanceData *) Tcl_GetHashValue(hashPtr);
     if (!instanceData) {
         if (interp) {
-            Tcl_SetObjResult(interp,
-                             Tcl_NewStringObj(ERROR_INVALID_INSTANCE, -1));
+            Tcl_SetObjResult(
+                interp,
+                Tcl_NewStringObj(ERROR_INVALID_INSTANCE, -1)
+            );
         }
         return(NULL);
     }
