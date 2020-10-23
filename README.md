@@ -88,5 +88,5 @@ similar. Use `stringify` to get their JSON representation instead.
 
 MIT.
 
-Duktape 2.5 is copyright (c) 2013-2019 by Duktape authors and is distributed
-under the MIT license. See `external/LICENSE.txt`.
+Duktape 2.6 is copyright (c) 2013-2020 by Duktape authors and is distributed
+under the MIT license. See `vendor/duktape/LICENSE.txt`.
