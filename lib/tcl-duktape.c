@@ -1071,6 +1071,8 @@ static int RegisterFunction_Cmd(
     }
 
     lambdaObj = Tcl_NewListObj(2, objv + 3);
+    Tcl_ListObjAppendElement(interp, lambdaObj,
+      Tcl_NewStringObj(Tcl_GetCurrentNamespace(interp)->fullName, -1));
     lambdaString = Tcl_GetStringFromObj(lambdaObj, &lambdaStringLength);
     Tcl_DecrRefCount(lambdaObj);
 
