@@ -5,24 +5,24 @@
 # LICENSE for details.
 
 package require TclOO
+package require duktape
 
 namespace eval ::duktape::oo {}
 
 ::oo::class create ::duktape::oo::Duktape {
+    variable id
+
     constructor {{_debug 0}} {
-        my variable id
         my variable debug
         set id [::duktape::init]
         set debug $_debug
     }
 
     destructor {
-        my variable id
         ::duktape::close $id
     }
 
     method eval {code} {
-        my variable id
         my variable debug
         if {$debug} {
             set printedCode $code
@@ -35,7 +35,6 @@ namespace eval ::duktape::oo {}
     }
 
     method call-method args {
-        my variable id
         my variable debug
         if {$debug} {
             puts "calling method $args"
@@ -44,7 +43,6 @@ namespace eval ::duktape::oo {}
     }
 
     method call args {
-        my variable id
         my variable debug
         if {$debug} {
             puts "calling function $args"
@@ -54,32 +52,31 @@ namespace eval ::duktape::oo {}
 
     foreach type $::duktape::types {
         method call-method-$type args [format {
-            my variable id
             ::duktape::call-method-%s $id {*}$args
         } $type]
 
         method call-$type args [format {
-            my variable id
             ::duktape::call-%s $id {*}$args
         } $type]
     }
 
     method js-proc {name arguments body} {
-        my variable id
         uplevel 1 ::duktape::js-proc [list $id] [list $name] [list $arguments] \
                 [list $body]
     }
 
     method js-method {name arguments body} {
-        my variable id
         namespace eval [self namespace]::js-methods {}
         set procName [self namespace]::js-methods::$name
         ::duktape::js-proc $id $procName $arguments $body
         ::oo::objdefine [self object] forward $name $procName
     }
 
+    method tcl-function args {
+        uplevel 1 [list ::duktape::tcl-function $id {*}$args]
+    }
+
     method token {} {
-        my variable id
         return $id
     }
 }
