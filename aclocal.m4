@@ -340,7 +340,6 @@ AC_DEFUN([DC_CHK_OS_INFO], [
 				;;
 			mingw32|mingw32msvc*)
 				SHOBJEXT="dll"
-				AREXT='lib'
 				CFLAGS="$CFLAGS -mms-bitfields"
 				CPPFLAGS="$CPPFLAGS -mms-bitfields"
 				SHOBJCPPFLAGS="-DPIC"
