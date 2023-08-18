@@ -1,5 +1,5 @@
 # tcl-duktape OO wrapper.
-# Copyright (c) 2015, 2016, 2017, 2019, 2020
+# Copyright (c) 2015-2017, 2019, 2020, 2023
 # dbohdan and contributors listed in AUTHORS
 # This code is released under the terms of the MIT license. See the file
 # LICENSE for details.
