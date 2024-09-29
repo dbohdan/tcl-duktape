@@ -1,6 +1,6 @@
 /*
  * Tcl bindings for Duktape.
- * Copyright (c) 2015-2019, 2020, 2023
+ * Copyright (c) 2015-2019, 2020, 2023-2024
  * D. Bohdan and contributors listed in AUTHORS
  * This code is released under the terms of the MIT license. See the file
  * LICENSE for details.
@@ -108,7 +108,7 @@ parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
     ctx = instanceData->ctx;
     if (del) {
         Tcl_DeleteHashEntry(hashPtr);
-        ckfree(instanceData);
+        Tcl_Free(instanceData);
     }
     return ctx;
 }
@@ -127,7 +127,7 @@ static void Tclduk_LambdaObjType_Free(Tcl_Obj *lambdaObj) {
     ClientData cdata;
     Tcl_Obj *handle, *lambdaNameObj, *bytecode;
     const char *lambdaName;
-    int lambdaNameLength;
+    Tcl_Size lambdaNameLength;
     duk_context *ctx;
     int freeDukLambda;
 
@@ -146,7 +146,7 @@ static void Tclduk_LambdaObjType_Free(Tcl_Obj *lambdaObj) {
     handle        = instanceData->handle;
     bytecode      = instanceData->bytecode;
 
-    ckfree(instanceData);
+    Tcl_Free(instanceData);
 
     Tcl_DecrRefCount(bytecode);
 
@@ -203,7 +203,7 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
     Tcl_Obj *handle, *lambdaName, *bytecode;
     Tcl_Obj *dukStringObj, *dukItemObj, *dukCodeObj, *dukCodeLineObj;
     char *stringRep;
-    int stringRepLength;
+    Tcl_Size stringRepLength;
 
     instanceData = lambdaObj->internalRep.otherValuePtr;
 
@@ -292,7 +292,7 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
      * Use this string rep as our object's string rep
      */
     stringRep = Tcl_GetStringFromObj(dukStringObj, &stringRepLength);
-    lambdaObj->bytes  = ckalloc(stringRepLength + 1);
+    lambdaObj->bytes  = Tcl_Alloc(stringRepLength + 1);
     lambdaObj->bytes[stringRepLength] = '\0';
 
     memcpy(lambdaObj->bytes, stringRep, stringRepLength);
@@ -329,8 +329,8 @@ static Tcl_Obj *Tclduk_LambdaObjType_New(
     struct DuktapeLambdaInstanceData *instanceData;
     Tcl_Obj *retval;
 
-    instanceData = ckalloc(sizeof(*instanceData));
-    retval       = ckalloc(sizeof(*retval));
+    instanceData = Tcl_Alloc(sizeof(*instanceData));
+    retval       = Tcl_Alloc(sizeof(*retval));
 
     retval->refCount = 0;
     retval->bytes    = NULL;
@@ -370,11 +370,11 @@ cleanup_interp(ClientData cdata, Tcl_Interp *interp)
 
         Tcl_DecrRefCount(instanceData->handle);
 
-        ckfree(instanceData);
+        Tcl_Free(instanceData);
         hashPtr = Tcl_NextHashEntry(&search);
     }
     Tcl_DeleteHashTable(&DUKTCL_CDATA->table);
-    ckfree((char *)DUKTCL_CDATA);
+    Tcl_Free((char *)DUKTCL_CDATA);
     return;
     /* UNREACH: Disable some warnings */
     interp = interp;
@@ -556,8 +556,8 @@ static duk_idx_t Tclduk_TclToJS(
     double valueDouble;
     duk_idx_t checkRet;
     int valueBoolean;
-    int valueStringLength, firstTypeStringLength;
-    int idx, numItems;
+    Tcl_Size valueStringLength, firstTypeStringLength;
+    Tcl_Size idx, numItems;
     int tclRet;
 
     /*
@@ -776,7 +776,7 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp,
 
     numRetVals = Tclduk_TclToJS(interp, evalResult, ctx, returnType);
 
-    Tcl_FreeResult(interp);
+    Tcl_ResetResult(interp);
 
     return(numRetVals);
 }
@@ -894,7 +894,7 @@ Init_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
         }
     }
 
-    instanceData = ckalloc(sizeof(*instanceData));
+    instanceData = Tcl_Alloc(sizeof(*instanceData));
     instanceData->interp = interp;
     instanceData->lambdaCount = 0;
     instanceData->cdata = cdata;
@@ -1048,7 +1048,7 @@ static int RegisterFunction_Cmd(
     duk_context *ctx;
     Tcl_Obj *lambdaObj;
     const char *functionName, *returnType, *lambdaString;
-    int lambdaStringLength, returnTypeLength;
+    Tcl_Size lambdaStringLength, returnTypeLength;
 
     if (objc != 5 && objc != 6) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_TCL_FUNCTION);
@@ -1098,7 +1098,7 @@ static int EvalLambda_Cmd(
     duk_context *ctx;
     Tcl_Obj *lambdaNameObj, *bytecodeObj, *result;
     const char *lambdaName, *bytecode;
-    int lambdaNameLength, bytecodeLength;
+    Tcl_Size lambdaNameLength, bytecodeLength;
     int idx;
     int retval;
 
@@ -1214,7 +1214,7 @@ CallMethod_Cmd(
 )
 {
     int i;
-    int list_length;
+    Tcl_Size list_length;
     int tableIndex;
     int int_value;
     double double_value;
@@ -1346,7 +1346,7 @@ Tclduktape_Init(Tcl_Interp *interp)
     }
 #endif
 
-    duktape_data = (struct DuktapeData *) ckalloc(sizeof(struct DuktapeData));
+    duktape_data = (struct DuktapeData *) Tcl_Alloc(sizeof(struct DuktapeData));
 
     /* Create the namespace. */
     if (Tcl_FindNamespace(interp, NS, NULL, 0) == NULL) {

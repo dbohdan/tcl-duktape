@@ -1,0 +1,8 @@
+#
+# Tcl package index file
+#
+package ifneeded duktape @PACKAGE_VERSION@ \
+    "load [list [file join $dir @PKG_LIB_FILE@]]; source [list [file join $dir utils.tcl]]"
+
+package ifneeded duktape::oo @PACKAGE_VERSION@ \
+    [list source [file join $dir oo.tcl]]
