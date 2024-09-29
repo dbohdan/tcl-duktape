@@ -5,11 +5,12 @@ a JavaScript interpreter library.
 
 ## Installation
 
-You will need Tcl 8.5, 8.6, or 9 installed on your system and available as `tclsh`
-to build tcl-duktape. You will also need the header files for Tcl. Duktape
-itself is bundled in the repository. To use the object-oriented API wrapper
-and the JSON object system [TclOO](https://wiki.tcl-lang.org/18152) is
-required.
+You will need Tcl 8.6 or 9 installed on your system to build tcl-duktape.
+Tcl 8.5 may work with minor modifications but isn't supported.
+You will also need the header files for Tcl.
+Duktape itself is bundled in the repository.
+To use the object-oriented API wrapper and the JSON object system,
+[TclOO](https://wiki.tcl-lang.org/page/TclOO) is required.
 
 ```sh
 # Build and test.
@@ -35,57 +36,55 @@ sudo make install
 * `::duktape::make-safe token` -> (nothing)`
 * `::duktape::make-unsafe token` -> (nothing)`
 
-`make-safe` and `make-unsafe` control whether a new JavaScript function named
-`Duktape.tcl.eval()` is created that allows for evaluation of arbitrary Tcl
-scripts.
+The commands `make-safe` and `make-unsafe` control whether a JavaScript function named `Duktape.tcl.eval()` is available.
+This function allows JavaScript to evaluate arbitrary Tcl code in the Tcl interpreter.
 
 The optional `returnType` argument to `tcl-function` may be one of:
-  * `boolean` — results in a boolean
-  * `bytearray` — results in a Duktape [buffer](https://duktape.org/guide.html#bufferobjects)
-  * `string` — default; results in a string
-  * `undefined` — return value ignored
-  * `null` — results in a JavaScript null regardless of the actual data
-  * `double` — results in a number
-  * `integer` — same as `double`
-  * `bigint` — results in a JavaScript string representation of an integer
-  * `json` — expects a JSON string; the result is the string decoded as JSON
-  * `array itemType` — for each item in the Tcl list, encode as `itemType`;
-                       the result is an array
+
+- `boolean` — results in a boolean
+- `bytearray` — results in a Duktape [buffer](https://duktape.org/guide.html#bufferobjects)
+- `string` — default; results in a string
+- `undefined` — return value ignored
+- `null` — results in a JavaScript `null` regardless of the actual data
+- `double` — results in a number
+- `integer` — same as `double`
+- `bigint` — results in a JavaScript string representation of an integer
+- `json` — expects a JSON string; the result is the string decoded as JSON
+- `array itemType` — for each item in the Tcl list, encode as `itemType`; the result is an array
 
 ### TclOO wrapper
 
-* `::duktape::oo::Duktape new` -> (objName)
-* `$objName destroy` -> (nothing)
-* `$objName eval code` -> (evaluation result)
-* `$objName call-method method this ?{arg ?type?}?` -> (evaluation result)
-* `$objName call-method-(str|num) method this ?arg?` -> (evaluation result)
-* `$objName call function ?{arg ?type?}?` -> (evaluation result)
-* `$objName call-(str|num) function ?arg?` -> (evaluation result)
-* `$objName js-proc name arguments body` -> (nothing)
-* `$objName js-method name arguments body` -> (nothing)
-* `$objname tcl-function name ?returnType? arguments body -> (nothing)
-* `$objName token` -> token (for the procedural API)
+- `::duktape::oo::Duktape new` -> (objName)
+- `$objName destroy` -> (nothing)
+- `$objName eval code` -> (evaluation result)
+- `$objName call-method method this ?{arg ?type?}?` -> (evaluation result)
+- `$objName call-method-(str|num) method this ?arg?` -> (evaluation result)
+- `$objName call function ?{arg ?type?}?` -> (evaluation result)
+- `$objName call-(str|num) function ?arg?` -> (evaluation result)
+- `$objName js-proc name arguments body` -> (nothing)
+- `$objName js-method name arguments body` -> (nothing)
+- `$objname tcl-function name ?returnType? arguments body` -> (nothing)
+- `$objName token` -> token (for the procedural API)
 
-`js-method` defines a new method in JavaScript on the Duktape object instance
-`$objName`.
+`js-method` defines a new method in JavaScript on the Duktape object instance `$objName`.
 
 ### JSON objects
 
-* `::duktape::oo::JSON new` -> (objName)
-* `$objName destroy` -> (nothing)
-* `$objName get key ?key ...?` -> (value)
-* `$objName get-json ?key ...?` -> (JSON string)
-* `$objName set key ?key ...? value` -> (nothing)
-* `$objName set-json ?key ...? value` -> (nothing)
-* `$objName stringify` -> (JSON string)
-* `$objName parse value` -> (nothing)
+- `::duktape::oo::JSON new` -> (objName)
+- `$objName destroy` -> (nothing)
+- `$objName get key ?key ...?` -> (value)
+- `$objName get-json ?key ...?` -> (JSON string)
+- `$objName set key ?key ...? value` -> (nothing)
+- `$objName set-json ?key ...? value` -> (nothing)
+- `$objName stringify` -> (JSON string)
+- `$objName parse value` -> (nothing)
 
-Note that `get` returns objects to Tcl as the string "[object Object]" or
-similar. Use `stringify` to get their JSON representation instead.
+Note that `get` returns objects to Tcl as the string `[object Object]` or similar.
+Use `stringify` to get a JSON representation.
 
 ## License
 
 MIT.
 
-Duktape 2.7 is copyright (c) 2013-2022 by Duktape authors and is distributed
-under the MIT license. See `vendor/duktape/LICENSE.txt`.
+Duktape 2.7 is copyright (c) 2013–2022 by Duktape authors and is distributed under the MIT license.
+See `vendor/duktape/LICENSE.txt`.
