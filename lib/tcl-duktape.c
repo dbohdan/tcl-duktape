@@ -108,6 +108,7 @@ parse_id(ClientData cdata, Tcl_Interp *interp, Tcl_Obj *const idobj, int del)
     ctx = instanceData->ctx;
     if (del) {
         Tcl_DeleteHashEntry(hashPtr);
+        Tcl_DecrRefCount(instanceData->handle);
         ckfree(instanceData);
     }
     return ctx;
@@ -981,8 +982,6 @@ static int MakeUnsafe_Cmd(
 static int
 Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
 {
-    struct DuktapeInstanceData *instanceData;
-    duk_memory_functions funcs;
     duk_context *ctx;
 
     if (objc != 2) {
@@ -996,12 +995,6 @@ Close_Cmd(ClientData cdata, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[])
     }
 
     duk_destroy_heap(ctx);
-
-    duk_get_memory_functions(ctx, &funcs);
-    instanceData = funcs.udata;
-
-    Tcl_DecrRefCount(instanceData->handle);
-
 
     return TCL_OK;
 }
@@ -1074,7 +1067,6 @@ static int RegisterFunction_Cmd(
     Tcl_ListObjAppendElement(interp, lambdaObj,
       Tcl_NewStringObj(Tcl_GetCurrentNamespace(interp)->fullName, -1));
     lambdaString = Tcl_GetStringFromObj(lambdaObj, &lambdaStringLength);
-    Tcl_DecrRefCount(lambdaObj);
 
     duk_push_global_object(ctx);                                   /* => [global] */
     duk_push_c_function(ctx, EvalTclCmdFromJS, DUK_VARARGS);       /* => [global] [function] */
@@ -1084,6 +1076,8 @@ static int RegisterFunction_Cmd(
     duk_put_prop_string(ctx, -2, DUK_HIDDEN_SYMBOL("returnType")); /* => [global] [function] */
     duk_put_prop_string(ctx, -2, functionName);                    /* => [global] */
     duk_pop(ctx);                                                  /* => */
+
+    Tcl_DecrRefCount(lambdaObj);
 
     return(TCL_OK);
 }
