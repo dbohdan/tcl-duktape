@@ -331,7 +331,7 @@ static Tcl_Obj *Tclduk_LambdaObjType_New(
     Tcl_Obj *retval;
 
     instanceData = ckalloc(sizeof(*instanceData));
-    retval       = ckalloc(sizeof(*retval));
+    retval       = Tcl_NewObj();
 
     retval->refCount = 0;
     retval->bytes    = NULL;
