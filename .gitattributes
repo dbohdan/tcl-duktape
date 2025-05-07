@@ -4,3 +4,5 @@ configure     linguist-vendored
 config.guess  linguist-vendored
 config.sub    linguist-vendored
 install-sh    linguist-vendored
+tclconfig/    linguist-vendored
+vendor/       linguist-vendored
