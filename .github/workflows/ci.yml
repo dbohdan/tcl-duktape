@@ -1,15 +1,6 @@
 name: CI
 on: [push]
 jobs:
-  test-autoconf:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v1
-    - name: Install Tcl
-      run: sudo apt install tcl-dev
-    - name: Build and test
-      run: ./autogen.sh && ./configure && make test
   test-committed-configure:
     runs-on: ubuntu-latest
     steps:
