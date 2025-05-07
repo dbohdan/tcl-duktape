@@ -1,3 +1,0 @@
-[submodule "tclconfig"]
-	path = tclconfig
-	url = https://github.com/tcltk/tclconfig
