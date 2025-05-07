@@ -7,11 +7,13 @@
 package ifneeded "duktape" @PACKAGE_VERSION@ [list apply {dir {
     if {{@TCLEXT_BUILD@} eq "static"} {
       uplevel 1 [list load {} Tclduktape]
+    } elseif {[package vsatisfies [package provide Tcl] 9.0]} {
+      uplevel 1 [list load [file join $dir {@PKG_LIB_FILE9@}] Tclduktape]
     } else {
-      uplevel 1 [list load [file join $dir {@PKG_LIB_FILE@}] Tclduktape]
+      uplevel 1 [list load [file join $dir {@PKG_LIB_FILE8@}] Tclduktape]
     }
     uplevel 1 [list source [file join $dir utils.tcl]]
 }} $dir]
-package ifneeded "duktape::oo" 0.11.1 [list apply {dir {
+package ifneeded "duktape::oo" 0.12.0 [list apply {dir {
     uplevel 1 [list source [file join $dir oo.tcl]]
 }} $dir]

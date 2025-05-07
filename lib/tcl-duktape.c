@@ -128,7 +128,7 @@ static void Tclduk_LambdaObjType_Free(Tcl_Obj *lambdaObj) {
     ClientData cdata;
     Tcl_Obj *handle, *lambdaNameObj, *bytecode;
     const char *lambdaName;
-    int lambdaNameLength;
+    Tcl_Size lambdaNameLength;
     duk_context *ctx;
     int freeDukLambda;
 
@@ -204,7 +204,7 @@ static void Tclduk_LambdaObjType_String(Tcl_Obj *lambdaObj) {
     Tcl_Obj *handle, *lambdaName, *bytecode;
     Tcl_Obj *dukStringObj, *dukItemObj, *dukCodeObj, *dukCodeLineObj;
     char *stringRep;
-    int stringRepLength;
+    Tcl_Size stringRepLength;
 
     instanceData = lambdaObj->internalRep.otherValuePtr;
 
@@ -314,7 +314,12 @@ static Tcl_ObjType Tclduk_LambdaObjType = {
     Tclduk_LambdaObjType_Free,
     Tclduk_LambdaObjType_Dup,
     Tclduk_LambdaObjType_String,
+#ifdef TCL_OBJTYPE_V0
+    NULL,
+    TCL_OBJTYPE_V0
+#else
     NULL
+#endif
 };
 
 /**
@@ -557,8 +562,9 @@ static duk_idx_t Tclduk_TclToJS(
     double valueDouble;
     duk_idx_t checkRet;
     int valueBoolean;
-    int valueStringLength, firstTypeStringLength;
-    int idx, numItems;
+    Tcl_Size valueStringLength, firstTypeStringLength;
+    int idx;
+    Tcl_Size numItems;
     int tclRet;
 
     /*
@@ -777,7 +783,7 @@ static duk_ret_t EvalTclFromJSWithInterp(Tcl_Interp *interp,
 
     numRetVals = Tclduk_TclToJS(interp, evalResult, ctx, returnType);
 
-    Tcl_FreeResult(interp);
+    Tcl_ResetResult(interp);
 
     return(numRetVals);
 }
@@ -1041,7 +1047,7 @@ static int RegisterFunction_Cmd(
     duk_context *ctx;
     Tcl_Obj *lambdaObj;
     const char *functionName, *returnType, *lambdaString;
-    int lambdaStringLength, returnTypeLength;
+    Tcl_Size lambdaStringLength, returnTypeLength;
 
     if (objc != 5 && objc != 6) {
         Tcl_WrongNumArgs(interp, 1, objv, USAGE_TCL_FUNCTION);
@@ -1092,7 +1098,7 @@ static int EvalLambda_Cmd(
     duk_context *ctx;
     Tcl_Obj *lambdaNameObj, *bytecodeObj, *result;
     const char *lambdaName, *bytecode;
-    int lambdaNameLength, bytecodeLength;
+    Tcl_Size lambdaNameLength, bytecodeLength;
     int idx;
     int retval;
 
@@ -1208,7 +1214,7 @@ CallMethod_Cmd(
 )
 {
     int i;
-    int list_length;
+    Tcl_Size list_length;
     int tableIndex;
     int int_value;
     double double_value;
