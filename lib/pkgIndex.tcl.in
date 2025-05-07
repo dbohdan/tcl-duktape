@@ -8,7 +8,7 @@ package ifneeded "duktape" @PACKAGE_VERSION@ [list apply {dir {
     if {{@TCLEXT_BUILD@} eq "static"} {
       uplevel 1 [list load {} Tclduktape]
     } else {
-      uplevel 1 [list load [file join $dir {@EXTENSION_TARGET@}]]
+      uplevel 1 [list load [file join $dir {@PKG_LIB_FILE@}] Tclduktape]
     }
     uplevel 1 [list source [file join $dir utils.tcl]]
 }} $dir]
