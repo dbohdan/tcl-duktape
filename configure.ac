@@ -9,110 +9,131 @@ AC_PROG_INSTALL
 AC_GNU_SOURCE
 AC_PROG_LN_S
 
-dnl Monocypher requires C99
-if test "$ac_cv_prog_cc_c99" = no; then
-	AC_ERROR([C99 compiler required])
-fi
+#-----------------------------------------------------------------------
+# __CHANGE__
+# Specify the C source files to compile in TEA_ADD_SOURCES,
+# public headers that need to be installed in TEA_ADD_HEADERS,
+# stub library C source files to compile in TEA_ADD_STUB_SOURCES,
+# and runtime Tcl library files in TEA_ADD_TCL_SOURCES.
+# This defines PKG(_STUB)_SOURCES, PKG(_STUB)_OBJECTS, PKG_HEADERS
+# and PKG_TCL_SOURCES.
+#-----------------------------------------------------------------------
 
-dnl Determine system information
-DC_CHK_OS_INFO
+TEA_ADD_SOURCES([lib/tcl-duktape.c vendor/duktape/duktape.c])
+TEA_ADD_HEADERS([])
+TEA_ADD_INCLUDES([])
+TEA_ADD_LIBS([])
+TEA_ADD_CFLAGS([])
+TEA_ADD_STUB_SOURCES([])
+TEA_ADD_TCL_SOURCES([lib/utils.tcl lib/oo.tcl])
 
-dnl Look for appropriate headers
-AC_CHECK_HEADERS(stdint.h limits.h unistd.h stdlib.h string.h sys/stat.h sys/types.h fcntl.h sys/random.h)
+#--------------------------------------------------------------------
+# __CHANGE__
+#
+# You can add more files to clean if your extension creates any extra
+# files by extending CLEANFILES.
+# Add pkgIndex.tcl if it is generated in the Makefile instead of ./configure
+# and change Makefile.in to move it from CONFIG_CLEAN_FILES to BINARIES var.
+#
+# A few miscellaneous platform-specific items:
+# TEA_ADD_* any platform specific compiler/build info here.
+#--------------------------------------------------------------------
 
-dnl Perform Tcl Extension required stuff
-TCLEXT_INIT
-
-if test "$TCLEXT_BUILD" != 'static'; then
-	dnl Determine how to make shared objects
-	DC_GET_SHOBJFLAGS
-
-	EXTENSION_TARGET="libtclduktape.${SHOBJEXT}"
+#CLEANFILES="$CLEANFILES pkgIndex.tcl"
+if test "${TEA_PLATFORM}" = "windows" ; then
+    # Ensure no empty if clauses
+    :
+    #TEA_ADD_SOURCES([win/winFile.c])
+    #TEA_ADD_INCLUDES([-I\"$(${CYGPATH} ${srcdir}/win)\"])
 else
-	AC_CHECK_TOOL([AR], [ar], [false])
-	AC_CHECK_TOOL([RANLIB], [ranlib], [:])
-
-	EXTENSION_TARGET="libtclduktape.${AREXT}"
-fi
-AC_SUBST(EXTENSION_TARGET)
-AC_SUBST(TCLEXT_BUILD)
-
-dnl Locate libraries needed for math functions used
-for checkFunction in acos asin atan atan2 ceil cos exp floor fmod log pow sin sqrt tan; do
-	AC_SEARCH_LIBS($checkFunction, m,, [
-		AC_ERROR([Unable to find $checkFunction])
-	])
-done
-
-dnl Enable support for a debugging build
-tcl_duktape_debug='false'
-AC_ARG_ENABLE([debug], AS_HELP_STRING([--enable-debug], [enable debugging parameters]), [
-	if test "$enableval" = "yes"; then
-		tcl_duktape_debug='true'
-	fi
-])
-
-dnl If we are building a debug release, enable debugging flags
-if test "$tcl_duktape_debug" = 'true'; then
-	AC_DEFINE(TCLEXT_TCL_DUKTAPE_DEBUG, [1], [Enable debugging build])
-	AX_CHECK_COMPILE_FLAG([-mmpx -fcheck-pointer-bounds], [
-		AX_CHECK_LINK_FLAG([-mmpx -fcheck-pointer-bounds], [
-			CFLAGS="$CFLAGS -mmpx -fcheck-pointer-bounds"
-		])
-	])
-	AX_CHECK_COMPILE_FLAG([-g3], [CFLAGS="$CFLAGS -g3"])
-	AX_CHECK_COMPILE_FLAG([-ggdb3], [CFLAGS="$CFLAGS -ggdb3"])
-else
-	dnl If we are not doing debugging disable some of the more annoying warnings
-	AX_CHECK_COMPILE_FLAG([-Wno-unused-value], [CFLAGS="$CFLAGS -Wno-unused-value"])
-	AX_CHECK_COMPILE_FLAG([-Wno-unused-parameter], [CFLAGS="$CFLAGS -Wno-unused-parameter"])
-	AX_CHECK_COMPILE_FLAG([-Wno-deprecated-declarations], [CFLAGS="$CFLAGS -Wno-deprecated-declarations"])
-fi
-AX_CHECK_COMPILE_FLAG([-Wno-sign-compare], [CFLAGS="$CFLAGS -Wno-sign-compare"])
-
-dnl Enable compiler warnings
-AX_CHECK_COMPILE_FLAG([-Wall], [CFLAGS="-Wall $CFLAGS"])
-AX_CHECK_COMPILE_FLAG([-W], [
-	CFLAGS="-W $CFLAGS"
-	AX_CHECK_COMPILE_FLAG([-Wno-self-assign], [CFLAGS="$CFLAGS -Wno-self-assign"])
-	AX_CHECK_COMPILE_FLAG([-Wno-tautological-constant-out-of-range-compare], [CFLAGS="$CFLAGS -Wno-tautological-constant-out-of-range-compare"])
-])
-
-dnl Sync the RPATH if requested
-if test "$TCLEXT_BUILD" != 'static'; then
-	DC_SYNC_RPATH([yes])
+    # Ensure no empty else clauses
+    :
+    #TEA_ADD_SOURCES([unix/unixFile.c])
+    #TEA_ADD_LIBS([-lsuperfly])
 fi
 
-dnl Setup a stable ABI
-DC_SETUP_STABLE_API([${srcdir}/libtclduktape.vers], libtclduktape.syms)
-if test "$tcl_duktape_debug" = 'true'; then
-	WEAKENSYMS=':'
-	REMOVESYMS=':'
-fi
+#--------------------------------------------------------------------
+# __CHANGE__
+# Choose which headers you need.  Extension authors should try very
+# hard to only rely on the Tcl public header files.  Internal headers
+# contain private data structures and are subject to change without
+# notice.
+# This MUST be called after TEA_LOAD_TCLCONFIG / TEA_LOAD_TKCONFIG
+#--------------------------------------------------------------------
 
-dnl Default to using the amalgamation for static, not using it for shared
-if test "$TCLEXT_BUILD" != 'static'; then
-	tcl_duktape_amalgamation='false'
-else
-	tcl_duktape_amalgamation='true'
-fi
+TEA_PUBLIC_TCL_HEADERS
+#TEA_PRIVATE_TCL_HEADERS
 
-AC_ARG_ENABLE([amalgamation], AS_HELP_STRING([--enable-amalgamation], [enable compiling the whole program as a single translation unit (default: disabled for shared, enabled for static)]), [
-	if test "$enableval" = 'yes'; then
-		tcl_duktape_amalgamation='true'
-	elif test "$enableval" = 'no'; then
-		tcl_duktape_amalgamation='false'
-	else
-		AC_ERROR([Unknown value for --enable-amalgamation])
-	fi
-])
-if test "$tcl_duktape_amalgamation" = 'true'; then
-	TCL_DUKTAPE_AMALGAMATION='1'
-else
-	TCL_DUKTAPE_AMALGAMATION='0'
-fi
-AC_SUBST(TCL_DUKTAPE_AMALGAMATION)
+#TEA_PUBLIC_TK_HEADERS
+#TEA_PRIVATE_TK_HEADERS
+#TEA_PATH_X
 
-dnl Produce output
-AC_CONFIG_FILES([pkgIndex.tcl:${srcdir}/lib/pkgIndex.tcl.in Makefile libtclduktape.syms])
-AC_OUTPUT()
+#--------------------------------------------------------------------
+# Check whether --enable-threads or --disable-threads was given.
+# This auto-enables if Tcl was compiled threaded.
+#--------------------------------------------------------------------
+
+TEA_ENABLE_THREADS
+
+#--------------------------------------------------------------------
+# The statement below defines a collection of symbols related to
+# building as a shared library instead of a static library.
+#--------------------------------------------------------------------
+
+TEA_ENABLE_SHARED
+
+#--------------------------------------------------------------------
+# This macro figures out what flags to use with the compiler/linker
+# when building shared/static debug/optimized objects.  This information
+# can be taken from the tclConfig.sh file, but this figures it all out.
+#--------------------------------------------------------------------
+
+TEA_CONFIG_CFLAGS
+
+#--------------------------------------------------------------------
+# Set the default compiler switches based on the --enable-symbols option.
+#--------------------------------------------------------------------
+
+TEA_ENABLE_SYMBOLS
+
+#--------------------------------------------------------------------
+# This macro generates a line to use when building a library.  It
+# depends on values set by the TEA_ENABLE_SHARED, TEA_ENABLE_SYMBOLS,
+# and TEA_LOAD_TCLCONFIG macros above.
+#--------------------------------------------------------------------
+
+TEA_MAKE_LIB
+
+#--------------------------------------------------------------------
+# Determine the name of the tclsh and/or wish executables in the
+# Tcl and Tk build directories or the location they were installed
+# into. These paths are used to support running test cases only,
+# the Makefile should not be making use of these paths to generate
+# a pkgIndex.tcl file or anything else at extension build time.
+#--------------------------------------------------------------------
+
+TEA_PROG_TCLSH
+#TEA_PROG_WISH
+
+#--------------------------------------------------------------------
+# Setup a *Config.sh.in configuration file.
+#--------------------------------------------------------------------
+
+#TEA_EXPORT_CONFIG([sample])
+#AC_SUBST(SAMPLE_VAR)
+
+#--------------------------------------------------------------------
+# Specify files to substitute AC variables in. You may alternatively
+# have a special pkgIndex.tcl.in or other files which require
+# substituting the AC variables in. Include these here.
+#--------------------------------------------------------------------
+
+AC_CONFIG_FILES([Makefile pkgIndex.tcl:${srcdir}/lib/pkgIndex.tcl.in])
+#AC_CONFIG_FILES([sampleConfig.sh])
+
+#--------------------------------------------------------------------
+# Finally, substitute all of the various values into the files
+# specified with AC_CONFIG_FILES.
+#--------------------------------------------------------------------
+
+AC_OUTPUT
