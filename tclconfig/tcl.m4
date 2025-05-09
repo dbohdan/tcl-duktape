@@ -453,7 +453,10 @@ AC_DEFUN([TEA_LOAD_TCLCONFIG], [
 
     # The BUILD_$pkg is to define the correct extern storage class
     # handling when making this package
-    AC_DEFINE_UNQUOTED(BUILD_${PACKAGE_NAME}, [],
+    # To be able to sefely use the package name in a #define, it must not
+    # contain anything other than alphanumeric characters and underscores
+    SAFE_PKG_NAME=patsubst(AC_PACKAGE_NAME, [[^A-Za-z0-9_]], [_])
+    AC_DEFINE_UNQUOTED(BUILD_${SAFE_PKG_NAME}, [],
 	    [Building extension source?])
     # Do this here as we have fully defined TEA_PLATFORM now
     if test "${TEA_PLATFORM}" = "windows" ; then
