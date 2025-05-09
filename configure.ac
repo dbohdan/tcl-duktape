@@ -1,12 +1,17 @@
 dnl Define ourselves
-AC_INIT(tcl-duktape, 0.12.0)
+AC_INIT(tcl-duktape, 0.12.1)
+
+AC_GNU_SOURCE
+
+# Perform some TEA related initialization
+TEA_INIT
+TEA_PATH_TCLCONFIG
+TEA_LOAD_TCLCONFIG
+TEA_PREFIX
 
 dnl Checks for programs.
-AC_PROG_CC
+TEA_SETUP_COMPILER
 AC_PROG_CC_C99
-AC_PROG_MAKE_SET
-AC_PROG_INSTALL
-AC_GNU_SOURCE
 AC_PROG_LN_S
 
 #-----------------------------------------------------------------------
